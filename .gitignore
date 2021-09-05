@@ -1,6 +1,11 @@
 # Compiled class file
 *.class
 
+# IDE config
+.project
+.settings/
+.classpath
+
 #Maven
 target/
 pom.xml.tag
