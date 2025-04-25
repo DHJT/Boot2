@@ -5,6 +5,8 @@
 .project
 .settings/
 .classpath
+.factorypath
+.idea/
 
 #Maven
 target/
@@ -15,7 +17,15 @@ pom.xml.next
 release.properties
 dependency-reduced-pom.xml
 buildNumber.properties
-.mvn/timing.properties
+
+
+# 默认忽略整个 .mvn 目录
+.mvn/
+
+# 但保留必要的项目级配置
+!.mvn/wrapper/
+!.mvn/extensions.xml
+!.mvn/maven.config
 .mvn/wrapper/maven-wrapper.jar
 
 # Log file
