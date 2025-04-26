@@ -25,8 +25,7 @@ public class AppApplication {
     SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss.SSS");//设置日期格式,精确到毫秒
 
     public static void main(String[] args) {
-//	    System.exit(SpringApplication
-//                .exit(SpringApplication.run(AppApplication.class, args)));
+//	    System.exit(SpringApplication.exit(SpringApplication.run(AppApplication.class, args)));
         SpringApplication.run(AppApplication.class, args);
     }
 

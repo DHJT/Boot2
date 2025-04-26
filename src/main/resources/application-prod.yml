@@ -9,11 +9,11 @@ server:
     uri-encoding: UTF-8
 spring:
   application:
-    name: boot2_demo
+    name: boot2
   datasource:
     username: root
     password: 123456
-    driver-class-name: org.mariadb.jdbc.Driver
+    driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/boot?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC&useSSL=false
   jpa:
     hibernate:
@@ -44,5 +44,3 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
-
-
