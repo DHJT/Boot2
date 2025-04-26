@@ -1,5 +1,5 @@
 server:
-  port: 10001
+  port: 10002
   http2:
     enabled: true
   servlet:
@@ -8,18 +8,30 @@ server:
   tomcat:
     uri-encoding: UTF-8
 spring:
+  resources:
+    cache:
+      period: 0
+  freemarker:
+    enabled: false
+    template-loader-path: classpath:/templates/
+    suffix: .ftl
+    cache: false
   application:
     name: boot2_demo
   datasource:
     username: root
     password: 123456
-    driver-class-name: org.mariadb.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/boot?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC&useSSL=false
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/boot?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC&useSSL=false&autoReconnect=true&serverTimezone=Asia/Shanghai
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
-
+  security:
+    enabled: false
+    user:
+      name: user
+      password: 123456
 #entitymanager.packagesToScan:
 
 #启用shutdown

@@ -41,4 +41,5 @@ public class Swagger2 {
 				// 描述
 				.description("API 描述").build();
 	}
+
 }

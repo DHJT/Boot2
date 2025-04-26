@@ -11,53 +11,53 @@ import javax.validation.constraints.NotNull;
 @Table(name = "Employee")
 public class Account {
 
-	// The entity fields (private)
-	@Id
-	@GeneratedValue(strategy = GenerationType.AUTO)
-	private long id;
+    // The entity fields (private)
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private long id;
 
-	@NotNull
-	private String email;
+    @NotNull
+    private String email;
 
-	@NotNull
-	private String name;
+    @NotNull
+    private String name;
 
-	// Public methods
+    // Public methods
 
-	public Account() {
-	}
+    public Account() {
+    }
 
-	public Account(long id) {
-		this.id = id;
-	}
+    public Account(long id) {
+        this.id = id;
+    }
 
-	public Account(String email, String name) {
-		this.email = email;
-		this.name = name;
-	}
+    public Account(String email, String name) {
+        this.email = email;
+        this.name = name;
+    }
 
-	public long getId() {
-		return id;
-	}
+    public long getId() {
+        return id;
+    }
 
-	public void setId(long id) {
-		this.id = id;
-	}
+    public void setId(long id) {
+        this.id = id;
+    }
 
-	public String getEmail() {
-		return email;
-	}
+    public String getEmail() {
+        return email;
+    }
 
-	public void setEmail(String email) {
-		this.email = email;
-	}
+    public void setEmail(String email) {
+        this.email = email;
+    }
 
-	public String getName() {
-		return name;
-	}
+    public String getName() {
+        return name;
+    }
 
-	public void setName(String name) {
-		this.name = name;
-	}
+    public void setName(String name) {
+        this.name = name;
+    }
 
 }

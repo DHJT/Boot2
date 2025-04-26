@@ -34,4 +34,11 @@
 
 1. [网站首页](http://127.0.0.1:8080/springboot2)
 
+```shell
+mysql -uroot -p
+```
+```sql
+ CREATE DATABASE boot;
+```
+
 #### 参与贡献
