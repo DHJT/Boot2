@@ -25,7 +25,7 @@ public class Swagger2 {
 	public Docket createRestApi() {
 		return new Docket(DocumentationType.SWAGGER_2).apiInfo(apiInfo()).select()
 				// 为当前包路径
-				.apis(RequestHandlerSelectors.basePackage("com.example.demo.controllers"))
+				.apis(RequestHandlerSelectors.basePackage("com.example.demo.controller"))
 				.paths(PathSelectors.any()).build();
 	}
 
