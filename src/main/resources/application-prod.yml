@@ -1,0 +1,48 @@
+server:
+  port: 10001
+  http2:
+    enabled: true
+  servlet:
+#    path: /
+    session.timeout: 10
+  tomcat:
+    uri-encoding: UTF-8
+spring:
+  application:
+    name: boot2_demo
+  datasource:
+    username: root
+    password: 123456
+    driver-class-name: org.mariadb.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/boot?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC&useSSL=false
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+#entitymanager.packagesToScan:
+
+#启用shutdown
+#禁用密码验证endpoints.shutdown.sensitive=false
+management:
+#  server:
+#    servlet:
+#      context-path: /manager
+#    address:
+#    port: 8012
+  endpoint:
+    shutdown:
+      enabled: true
+    health:
+      show-details: always
+  endpoints:
+    health: ""
+    web:
+      exposure:
+        include:
+        - "*"
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+
