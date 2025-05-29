@@ -9,7 +9,7 @@ import reactor.core.publisher.Mono;
 @AllArgsConstructor
 @NoArgsConstructor
 public class User {
-    private String id;
+    private Long id;
     private String name;
     private String email;
 

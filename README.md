@@ -23,6 +23,7 @@
 - 工具说明:
     + 使用了Spring官方的STS工具
     + 或者使用IEDA进行编写
+- 使用 Knife4j 进行接口文档展示（Knife4j 是在Swagger上进行了扩展）
 
 
 #### 安装教程
@@ -33,5 +34,11 @@
 
 #### 使用说明
 
+1. Knife4j 接口文档访问地址
+http://localhost:8080/doc.html
+
+2. Swagger 接口文档访问地址
+http://localhost:8080/swagger-ui/index.html
+http://localhost:8080/swagger-ui/index.html
 
 #### 参与贡献

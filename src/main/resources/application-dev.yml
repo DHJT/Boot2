@@ -31,7 +31,24 @@ spring:
 #    show-sql: true
 
 #entitymanager.packagesToScan:
-
+# springdoc-openapi项目配置
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: tech.dhjt.boot3.controller
+# knife4j的增强配置，不需要增强可以不配
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+  
 #启用shutdown
 #禁用密码验证endpoints.shutdown.sensitive=false
 management:

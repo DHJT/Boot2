@@ -15,7 +15,6 @@ import org.springframework.context.annotation.Bean;
         ElasticsearchDataAutoConfiguration.class,  // 禁用 Elasticsearch 数据自动配置
         ElasticsearchRestClientAutoConfiguration.class  // 禁用 Elasticsearch REST 客户端自动配置
 })
-
 public class AppApplication {
 
     SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss.SSS");//设置日期格式,精确到毫秒
