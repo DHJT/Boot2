@@ -5,7 +5,7 @@ Spring Boot 4
 - JDK 17
 - Maven 3.6.3或更高的版本。
 - Gradle 7.6.4或更高的版本。
-
+- https://docs.spring.io/spring-boot/4.0/system-requirements.html
 
 ### 新特性
 1. 多版本支持
@@ -33,4 +33,11 @@ http://localhost:8080/actuator/
 
 ```sh
 curl http://localhost:8080/test  -H "version: 1"
+```
+
+### 构建
+```sh
+mvn spring-boot:process-aot
+mvn -PnativeTest test
+mvn -Pnative native:compile
 ```

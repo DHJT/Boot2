@@ -1,11 +1,13 @@
 server:
   port: 8080
   tomcat.threads.virtual.enabled: true
-# 全局启用虚拟线程
+
 spring:
+  native.mode: native
+  aot.enabled: true
   threads:
     virtual:
-      enabled: true
+      enabled: true # 全局启用虚拟线程
 management:
   endpoint:
     health:
@@ -17,4 +19,7 @@ management:
     web:
       exposure:
         include: "*" # health,env,configprops,info,metrics
-  
+    jmx:
+      exposure:
+        include: "*"
+        
