@@ -11,24 +11,22 @@ server:
 spring:
   application:
     name: boot2
-  jackson:
+  Jackson:
     time-zone: Asia/Shanghai
-  data:
-    elasticsearch:
-      repositories:
-        enabled: false
-  elasticsearch:
-    uris:
-    - 192.168.1.8:9200
-#  datasource:
-#    username: root
-#    password: 123456
-#    driver-class-name: org.mariadb.jdbc.Driver
-#    url: jdbc:mysql://localhost:3306/boot?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC&useSSL=false
-#  jpa:
-#    hibernate:
-#      ddl-auto: update
-#    show-sql: true
+  datasource:
+#    url: jdbc:h2:file:~/flowable_db;DB_CLOSE_DELAY=-1;MODE=MySQL;AUTO_SERVER=TRUE # 文件持久化； jdbc:h2:mem:testdb 内存数据库，名称为 testdb。
+    url: jdbc:h2:file:./flowable_db;DB_CLOSE_DELAY=-1;
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate.ddl-auto: update    # 自动建表，开发常用
+    show-sql: true                # 打印 SQL，便于调试
+  h2:
+    console:
+      enabled: true
+      path: /h2-console     # 访问路径
 
 #entitymanager.packagesToScan:
 # springdoc-openapi项目配置
@@ -63,7 +61,6 @@ management:
     health:
       show-details: always
   endpoints:
-    health: ""
     web:
       exposure:
         include:
@@ -72,3 +69,11 @@ management:
     tags:
       application: ${spring.application.name}
 
+# Flowable 工作流引擎配置
+flowable:
+  # 自动部署流程定义（扫描 classpath:processes/）
+  async-executor-activate: false
+  database-schema-update: true
+  # 关闭自动部署，我们手动触发一次以确保最新
+  check-process-definitions: true
+  process-definition-location-prefix: classpath:/processes/

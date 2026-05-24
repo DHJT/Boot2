@@ -21,10 +21,11 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <java.version>22.0.1</java.version>
+        <java.version>22</java.version>
         <mariadb.version>2.3.0</mariadb.version>
         <mysql.version>8.0.20</mysql.version>
         <druid.version>1.1.11</druid.version>
+        <flowable.version>7.2.0</flowable.version>
     </properties>
 
     <dependencies>
@@ -42,13 +43,36 @@
 <!--            <groupId>org.springframework.boot</groupId>-->
 <!--            <artifactId>spring-boot-starter-undertow</artifactId>-->
 <!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>org.springframework.boot</groupId>-->
+<!--            <artifactId>spring-boot-starter-webflux</artifactId>-->
+<!--        </dependency>-->
+        <!-- Flowable 工作流引擎核心（无 UI/IDM，不引入 Spring Security） -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webflux</artifactId>
+            <groupId>org.flowable</groupId>
+            <artifactId>flowable-spring-boot-starter</artifactId>
+            <version>${flowable.version}</version>
+        </dependency>
+        <!-- Flowable 流程图生成 -->
+        <dependency>
+            <groupId>org.flowable</groupId>
+            <artifactId>flowable-image-generator</artifactId>
+            <version>${flowable.version}</version>
+        </dependency>
+<!--        自动计算并为流程模型生成缺失的 DI 信息-->
+        <dependency>
+            <groupId>org.flowable</groupId>
+            <artifactId>flowable-bpmn-layout</artifactId>
+            <version>${flowable.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <!-- H2 数据库（内存模式，无需 runtime 限定） -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
         </dependency>
 
         <dependency>
@@ -82,6 +106,13 @@
             <scope>provided</scope>
             <optional>true</optional>
         </dependency>
+<!--        &lt;!&ndash; Flowable 工作流引擎测试 &ndash;&gt;-->
+<!--        <dependency>-->
+<!--            <groupId>org.flowable</groupId>-->
+<!--            <artifactId>flowable-spring-boot-starter-test</artifactId>-->
+<!--            <version>${flowable.version}</version>-->
+<!--            <scope>test</scope>-->
+<!--        </dependency>-->
     </dependencies>
 
     <build>

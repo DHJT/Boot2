@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flowable 工作流演示平台</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif; background: #f0f2f5; }
+
+        #app { min-height: 100vh; }
+
+        .app-header {
+            background: linear-gradient(135deg, #409EFF 0%, #337ecc 100%);
+            color: white; padding: 16px 32px;
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .app-header h1 { font-size: 20px; font-weight: 600; }
+        .app-header .subtitle { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+
+        .app-main { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        .stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+        .stat-card {
+            background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            display: flex; align-items: center; gap: 16px;
+        }
+        .stat-card .icon { font-size: 36px; }
+        .stat-card .info { flex: 1; }
+        .stat-card .label { font-size: 13px; color: #909399; }
+        .stat-card .value { font-size: 28px; font-weight: 700; color: #303133; line-height: 1.2; }
+
+        .section { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .section-title { font-size: 16px; font-weight: 600; color: #303133; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .section-title::before { content: ''; display: inline-block; width: 4px; height: 18px; background: #409EFF; border-radius: 2px; }
+
+        /* ===== 流程卡片 ===== */
+        .process-card {
+            border: 1px solid #ebeef5; border-radius: 8px; margin-bottom: 16px;
+            background: #fff; overflow: hidden;
+        }
+        .process-card-header {
+            padding: 14px 20px; background: #f5f7fa;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid #ebeef5; cursor: pointer;
+        }
+        .process-card-header:hover { background: #ecf5ff; }
+        .process-card-header .left { display: flex; align-items: center; gap: 12px; }
+        .process-card-header .left .info h3 { font-size: 15px; font-weight: 600; }
+        .process-card-header .left .info .meta { font-size: 12px; color: #909399; margin-top: 2px; }
+        .process-card-body { padding: 16px 20px; }
+
+        /* ===== Timeline 样式 ===== */
+        .timeline { position: relative; padding-left: 30px; }
+        .timeline::before {
+            content: ''; position: absolute; left: 9px; top: 8px; bottom: 8px;
+            width: 2px; background: #e4e7ed;
+        }
+        .timeline-item { position: relative; padding-bottom: 20px; }
+        .timeline-item:last-child { padding-bottom: 0; }
+        .timeline-item .dot {
+            position: absolute; left: -26px; top: 4px;
+            width: 18px; height: 18px; border-radius: 50%;
+            background: #c0c4cc; border: 3px solid #e4e7ed; z-index: 1;
+        }
+        .timeline-item.completed .dot { background: #67c23a; border-color: #b3e19d; }
+        .timeline-item.pending .dot {
+            background: #e6a23c; border-color: #f3d19e;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(230,162,60,0.6); }
+            50% { box-shadow: 0 0 0 6px rgba(230,162,60,0.2); }
+            100% { box-shadow: 0 0 0 0 rgba(230,162,60,0.6); }
+        }
+        .timeline-item .content {
+            background: #f8f9fa; border-radius: 6px; padding: 12px 16px;
+            border-left: 3px solid #e4e7ed; position: relative;
+        }
+        .timeline-item.completed .content { border-left-color: #67c23a; }
+        .timeline-item.pending .content { border-left-color: #e6a23c; background: #fef9f0; }
+
+        .timeline-item .content .time { font-size: 12px; color: #909399; }
+        .timeline-item .content .node-title { font-weight: 600; font-size: 14px; margin: 2px 0 4px; }
+        .timeline-item .content .node-detail { font-size: 13px; color: #606266; line-height: 1.5; }
+        .timeline-item .content .actions { margin-top: 8px; display: flex; gap: 8px; }
+
+        /* ===== Tab 样式 ===== */
+        .process-tabs {
+            display: flex; gap: 0; margin-bottom: 20px;
+            background: #fff; border-radius: 8px 8px 0 0; overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .process-tab {
+            flex: 1; padding: 14px 20px; text-align: center; cursor: pointer;
+            font-size: 15px; font-weight: 500; color: #606266;
+            background: #f5f7fa; border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .process-tab:hover { color: #409EFF; background: #ecf5ff; }
+        .process-tab.active {
+            color: #409EFF; background: #fff;
+            border-bottom-color: #409EFF; font-weight: 600;
+        }
+        .process-tab.active.multi { color: #e6a23c; border-bottom-color: #e6a23c; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .flow-diagram { text-align: center; background: #fafafa; border-radius: 8px; padding: 16px; border: 1px dashed #dcdfe6; }
+        .flow-diagram img { max-width: 100%; max-height: 500px; }
+
+        .mb-2 { margin-bottom: 12px; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .gap-8 { gap: 8px; }
+
+        .process-badge {
+            display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px;
+            margin-left: 6px; vertical-align: middle;
+        }
+        .process-badge.leave { background: #ecf5ff; color: #409EFF; }
+        .process-badge.multi { background: #fdf6ec; color: #e6a23c; }
+
+        @media (max-width: 768px) {
+            .stat-cards { grid-template-columns: repeat(2, 1fr); }
+            .app-header { padding: 12px 16px; flex-direction: column; text-align: center; gap: 8px; }
+            .process-tabs { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <header class="app-header">
+        <div>
+            <h1>📋 Flowable 工作流演示平台</h1>
+            <div class="subtitle">Flowable BPMN 工作流引擎 · Spring Boot 3 · H2 数据库</div>
+        </div>
+        <div>
+            <el-button size="small" plain round @click="refreshAll" style="color:#fff;border-color:rgba(255,255,255,0.5);">
+                🔄 刷新数据
+            </el-button>
+        </div>
+    </header>
+
+    <main class="app-main">
+        <!-- 统计卡片（汇总两个流程） -->
+        <div class="stat-cards">
+            <div class="stat-card">
+                <span class="icon">📄</span>
+                <div class="info">
+                    <div class="label">流程定义</div>
+                    <div class="value">{{ stats.definitions }}</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <span class="icon">▶️</span>
+                <div class="info">
+                    <div class="label">运行中流程</div>
+                    <div class="value">{{ stats.running }}</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <span class="icon">✅</span>
+                <div class="info">
+                    <div class="label">已完成流程</div>
+                    <div class="value">{{ stats.finished }}</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <span class="icon">📌</span>
+                <div class="info">
+                    <div class="label">待办任务</div>
+                    <div class="value">{{ stats.pending }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 选项卡：切换两个流程 -->
+        <div class="process-tabs">
+            <div class="process-tab" :class="{ active: activeTab === 'leave' }" @click="switchTab('leave')">
+                🏖️ 请假审批流程
+                <span class="process-badge leave" v-if="leaveStats.running > 0">{{ leaveStats.running }} 运行中</span>
+            </div>
+            <div class="process-tab multi" :class="{ active: activeTab === 'multi' }" @click="switchTab('multi')">
+                🔄 多级复杂审批流程
+                <span class="process-badge multi" v-if="multiStats.running > 0">{{ multiStats.running }} 运行中</span>
+            </div>
+        </div>
+
+        <!-- ===== 请假流程 Tab ===== -->
+        <div class="tab-content" :class="{ active: activeTab === 'leave' }">
+            <!-- 流程图 -->
+            <div class="section">
+                <div class="section-title">流程图
+                    <el-tag size="small" type="info" v-if="leaveHighlightInstance">当前高亮: {{ leaveHighlightInstance }}</el-tag>
+                </div>
+                <div class="flow-diagram">
+                    <img :src="leaveDiagramUrl" alt="请假流程图" @error="leaveDiagramUrl='/flowable/diagram'">
+                </div>
+            </div>
+
+            <!-- 启动流程 -->
+            <div class="section">
+                <div class="section-title">🚀 启动请假流程</div>
+                <el-form :model="leaveForm" :inline="true" size="default">
+                    <el-form-item label="申请人">
+                        <el-input v-model="leaveForm.applicantName" placeholder="请输入姓名" style="width:140px"></el-input>
+                    </el-form-item>
+                    <el-form-item label="请假原因">
+                        <el-input v-model="leaveForm.reason" placeholder="请输入原因" style="width:200px"></el-input>
+                    </el-form-item>
+                    <el-form-item label="请假天数">
+                        <el-input-number v-model="leaveForm.days" :min="1" :max="30" style="width:120px"></el-input-number>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button type="primary" @click="startLeaveProcess" :loading="leaveStarting">提交申请</el-button>
+                    </el-form-item>
+                </el-form>
+                <el-alert v-if="leaveStartResult" :title="leaveStartResult" type="success" show-icon :closable="true" @close="leaveStartResult=''"></el-alert>
+            </div>
+
+            <!-- 流程列表 -->
+            <div class="section">
+                <div class="section-title">📋 请假流程（按时间倒序 · 运行中在前）</div>
+                <div v-if="leaveLoading" v-loading="leaveLoading" style="min-height:100px;"></div>
+                <div v-else-if="leaveProcesses.length === 0" style="text-align:center;padding:40px;color:#909399;">
+                    暂无请假流程，请先启动一个
+                </div>
+                <div v-else>
+                    <div v-for="proc in leaveProcesses" :key="proc.processInstanceId" class="process-card">
+                        <div class="process-card-header" @click="toggleExpand('leave', proc.processInstanceId)">
+                            <div class="left">
+                                <el-tag :type="proc.status === 'running' ? 'warning' : 'success'" size="small" effect="dark" round>
+                                    {{ proc.status === 'running' ? '运行中' : '已结束' }}
+                                </el-tag>
+                                <div class="info">
+                                    <h3>{{ proc.applicantName || '未知' }} 的请假申请</h3>
+                                    <div class="meta">
+                                        <span>原因：{{ proc.reason || '-' }} · 天数：{{ proc.days || '-' }}天</span>
+                                        <span style="margin-left:12px;">开始：{{ formatTime(proc.startTime) }}</span>
+                                        <span v-if="proc.endTime" style="margin-left:12px;">结束：{{ formatTime(proc.endTime) }}</span>
+                                        <span style="margin-left:12px;">实例ID：{{ proc.processInstanceId }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <el-button size="small" type="primary" link @click.stop="showLeaveDiagram(proc.processInstanceId)">查看流程图</el-button>
+                                <el-button size="small" type="default" link @click.stop="toggleExpand('leave', proc.processInstanceId)">
+                                    {{ leaveExpanded[proc.processInstanceId] ? '收起' : '展开' }}审批流
+                                    <span v-if="!leaveExpanded[proc.processInstanceId]">▼</span>
+                                    <span v-else>▲</span>
+                                </el-button>
+                            </div>
+                        </div>
+                        <div v-show="leaveExpanded[proc.processInstanceId]" class="process-card-body">
+                            <div v-if="!proc.timeline || proc.timeline.length === 0" style="color:#909399;text-align:center;padding:20px;">
+                                暂无审批记录
+                            </div>
+                            <div v-else class="timeline">
+                                <div v-for="(node, idx) in proc.timeline" :key="idx"
+                                     :class="['timeline-item', node.status]">
+                                    <div class="dot"></div>
+                                    <div class="content">
+                                        <div class="time">{{ formatTime(node.time) }}</div>
+                                        <div class="node-title">
+                                            {{ node.taskName }}
+                                            <el-tag v-if="node.status === 'pending'" type="warning" size="small" effect="light" style="margin-left:6px;">待审批</el-tag>
+                                            <el-tag v-else type="success" size="small" effect="light" style="margin-left:6px;">已完成</el-tag>
+                                        </div>
+                                        <div class="node-detail">
+                                            <span v-if="node.assignee">处理人：{{ node.assignee }}</span>
+                                            <span v-else-if="node.status === 'pending'">处理人：待领取</span>
+                                            <span v-if="node.candidateGroups && node.candidateGroups.length > 0" style="margin-left:8px;">
+                                                (候选组：{{ node.candidateGroups.join(', ') }})
+                                            </span>
+                                        </div>
+                                        <div class="node-detail" v-if="node.status === 'completed'">
+                                            <span>审批结果：
+                                                <el-tag v-if="node.approved === true" type="success" size="small">同意</el-tag>
+                                                <el-tag v-else-if="node.approved === false" type="danger" size="small">拒绝</el-tag>
+                                                <span v-else style="color:#909399;">-</span>
+                                            </span>
+                                            <span v-if="node.comment" style="margin-left:12px;">意见：{{ node.comment }}</span>
+                                        </div>
+                                        <div class="actions" v-if="node.status === 'pending' && node.taskId">
+                                            <el-button size="small" type="success" @click="quickApproveLeave(node, true, proc)">✅ 同意</el-button>
+                                            <el-button size="small" type="danger" @click="quickApproveLeave(node, false, proc)">❌ 拒绝</el-button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 多级审批流程 Tab ===== -->
+        <div class="tab-content" :class="{ active: activeTab === 'multi' }">
+            <!-- 流程图 -->
+            <div class="section">
+                <div class="section-title" style="--title-color: #e6a23c;">流程图
+                    <el-tag size="small" type="info" v-if="multiHighlightInstance">当前高亮: {{ multiHighlightInstance }}</el-tag>
+                </div>
+                <div class="flow-diagram">
+                    <img :src="multiDiagramUrl" alt="多级审批流程图" @error="multiDiagramUrl='/flowable/multi/diagram'">
+                </div>
+            </div>
+
+            <!-- 启动流程 -->
+            <div class="section">
+                <div class="section-title">🚀 启动多级审批流程</div>
+                <el-form :model="multiForm" :inline="true" size="default">
+                    <el-form-item label="申请人">
+                        <el-input v-model="multiForm.applicantName" placeholder="请输入姓名" style="width:140px"></el-input>
+                    </el-form-item>
+                    <el-form-item label="申请原因">
+                        <el-input v-model="multiForm.reason" placeholder="请输入原因" style="width:200px"></el-input>
+                    </el-form-item>
+                    <el-form-item label="天数">
+                        <el-input-number v-model="multiForm.days" :min="1" :max="30" style="width:120px"></el-input-number>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button type="primary" @click="startMultiProcess" :loading="multiStarting" style="background:#e6a23c;border-color:#e6a23c;">提交申请</el-button>
+                    </el-form-item>
+                </el-form>
+                <el-alert v-if="multiStartResult" :title="multiStartResult" type="success" show-icon :closable="true" @close="multiStartResult=''"></el-alert>
+            </div>
+
+            <!-- 流程列表 -->
+            <div class="section">
+                <div class="section-title">📋 多级审批流程（按时间倒序 · 运行中在前）</div>
+                <div v-if="multiLoading" v-loading="multiLoading" style="min-height:100px;"></div>
+                <div v-else-if="multiProcesses.length === 0" style="text-align:center;padding:40px;color:#909399;">
+                    暂无多级审批流程，请先启动一个
+                </div>
+                <div v-else>
+                    <div v-for="proc in multiProcesses" :key="proc.processInstanceId" class="process-card">
+                        <div class="process-card-header" @click="toggleExpand('multi', proc.processInstanceId)">
+                            <div class="left">
+                                <el-tag :type="proc.status === 'running' ? 'warning' : 'success'" size="small" effect="dark" round>
+                                    {{ proc.status === 'running' ? '运行中' : '已结束' }}
+                                </el-tag>
+                                <div class="info">
+                                    <h3>{{ proc.applicantName || '未知' }} 的申请</h3>
+                                    <div class="meta">
+                                        <span>原因：{{ proc.reason || '-' }} · 天数：{{ proc.days || '-' }}天</span>
+                                        <span style="margin-left:12px;">开始：{{ formatTime(proc.startTime) }}</span>
+                                        <span v-if="proc.endTime" style="margin-left:12px;">结束：{{ formatTime(proc.endTime) }}</span>
+                                        <span style="margin-left:12px;">实例ID：{{ proc.processInstanceId }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <el-button size="small" type="warning" link @click.stop="showMultiDiagram(proc.processInstanceId)">查看流程图</el-button>
+                                <el-button size="small" type="default" link @click.stop="toggleExpand('multi', proc.processInstanceId)">
+                                    {{ multiExpanded[proc.processInstanceId] ? '收起' : '展开' }}审批流
+                                    <span v-if="!multiExpanded[proc.processInstanceId]">▼</span>
+                                    <span v-else>▲</span>
+                                </el-button>
+                            </div>
+                        </div>
+                        <div v-show="multiExpanded[proc.processInstanceId]" class="process-card-body">
+                            <div v-if="!proc.timeline || proc.timeline.length === 0" style="color:#909399;text-align:center;padding:20px;">
+                                暂无审批记录
+                            </div>
+                            <div v-else class="timeline">
+                                <div v-for="(node, idx) in proc.timeline" :key="idx"
+                                     :class="['timeline-item', node.status]">
+                                    <div class="dot"></div>
+                                    <div class="content">
+                                        <div class="time">{{ formatTime(node.time) }}</div>
+                                        <div class="node-title">
+                                            {{ node.taskName }}
+                                            <el-tag v-if="node.status === 'pending'" type="warning" size="small" effect="light" style="margin-left:6px;">待审批</el-tag>
+                                            <el-tag v-else type="success" size="small" effect="light" style="margin-left:6px;">已完成</el-tag>
+                                        </div>
+                                        <div class="node-detail">
+                                            <span v-if="node.assignee">处理人：{{ node.assignee }}</span>
+                                            <span v-else-if="node.status === 'pending'">处理人：待领取</span>
+                                            <span v-if="node.candidateGroups && node.candidateGroups.length > 0" style="margin-left:8px;">
+                                                (候选组：{{ node.candidateGroups.join(', ') }})
+                                            </span>
+                                        </div>
+                                        <div class="node-detail" v-if="node.status === 'completed'">
+                                            <span>审批结果：
+                                                <el-tag v-if="node.approval === 'approved'" type="success" size="small">同意</el-tag>
+                                                <el-tag v-else-if="node.approval === 'rejected'" type="danger" size="small">拒绝</el-tag>
+                                                <span v-else style="color:#909399;">-</span>
+                                            </span>
+                                            <span v-if="node.comment" style="margin-left:12px;">意见：{{ node.comment }}</span>
+                                        </div>
+                                        <div class="actions" v-if="node.status === 'pending' && node.taskId">
+                                            <el-button size="small" type="success" @click="quickApproveMulti(node, 'approved', proc)">✅ 同意</el-button>
+                                            <el-button size="small" type="danger" @click="quickApproveMulti(node, 'rejected', proc)">❌ 拒绝</el-button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 审批意见对话框 - 请假流程 -->
+        <el-dialog v-model="leaveApprovalDialog.visible" :title="leaveApprovalDialog.title" width="420px">
+            <div style="margin-bottom:12px;">
+                <p><strong>任务：</strong>{{ leaveApprovalDialog.node?.taskName }}</p>
+                <p><strong>申请人：</strong>{{ leaveApprovalDialog.process?.applicantName }}</p>
+                <p><strong>原因：</strong>{{ leaveApprovalDialog.process?.reason }}</p>
+                <p><strong>天数：</strong>{{ leaveApprovalDialog.process?.days }}天</p>
+            </div>
+            <el-form>
+                <el-form-item label="审批决定">
+                    <el-tag :type="leaveApprovalDialog.approved ? 'success' : 'danger'" size="large">
+                        {{ leaveApprovalDialog.approved ? '同意' : '拒绝' }}
+                    </el-tag>
+                </el-form-item>
+                <el-form-item label="审批意见">
+                    <el-input v-model="leaveApprovalDialog.comment" type="textarea" :rows="3" placeholder="请输入审批意见（可选）"></el-input>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="leaveApprovalDialog.visible = false">取消</el-button>
+                <el-button type="primary" @click="submitLeaveApproval" :loading="leaveApprovalDialog.loading">确认提交</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 审批意见对话框 - 多级审批流程 -->
+        <el-dialog v-model="multiApprovalDialog.visible" :title="multiApprovalDialog.title" width="420px">
+            <div style="margin-bottom:12px;">
+                <p><strong>任务：</strong>{{ multiApprovalDialog.node?.taskName }}</p>
+                <p><strong>申请人：</strong>{{ multiApprovalDialog.process?.applicantName }}</p>
+                <p><strong>原因：</strong>{{ multiApprovalDialog.process?.reason }}</p>
+                <p><strong>天数：</strong>{{ multiApprovalDialog.process?.days }}天</p>
+            </div>
+            <el-form>
+                <el-form-item label="审批决定">
+                    <el-tag :type="multiApprovalDialog.approval === 'approved' ? 'success' : 'danger'" size="large">
+                        {{ multiApprovalDialog.approval === 'approved' ? '同意' : '拒绝' }}
+                    </el-tag>
+                </el-form-item>
+                <el-form-item label="审批意见">
+                    <el-input v-model="multiApprovalDialog.comment" type="textarea" :rows="3" placeholder="请输入审批意见（可选）"></el-input>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="multiApprovalDialog.visible = false">取消</el-button>
+                <el-button type="primary" @click="submitMultiApproval" :loading="multiApprovalDialog.loading">确认提交</el-button>
+            </template>
+        </el-dialog>
+    </main>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/element-plus"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+const { createApp, ref, reactive, onMounted } = Vue;
+
+const app = createApp({
+    setup() {
+        // ===== 全局状态 =====
+        const activeTab = ref('leave');
+
+        // 汇总统计
+        const stats = reactive({ definitions: 0, running: 0, finished: 0, pending: 0 });
+
+        // ===== 请假流程 =====
+        const leaveDiagramUrl = ref('/flowable/diagram');
+        const leaveHighlightInstance = ref('');
+
+        const leaveForm = reactive({ applicantName: '张三', reason: '回家探亲', days: 3 });
+        const leaveStarting = ref(false);
+        const leaveStartResult = ref('');
+
+        const leaveProcesses = ref([]);
+        const leaveLoading = ref(false);
+        const leaveExpanded = reactive({});
+
+        const leaveStats = reactive({ running: 0 });
+
+        const leaveApprovalDialog = reactive({
+            visible: false, node: null, process: null,
+            approved: true, comment: '', loading: false, title: '审批确认'
+        });
+
+        // ===== 多级审批流程 =====
+        const multiDiagramUrl = ref('/flowable/multi/diagram');
+        const multiHighlightInstance = ref('');
+
+        const multiForm = reactive({ applicantName: '李四', reason: '项目需求变更', days: 5 });
+        const multiStarting = ref(false);
+        const multiStartResult = ref('');
+
+        const multiProcesses = ref([]);
+        const multiLoading = ref(false);
+        const multiExpanded = reactive({});
+
+        const multiStats = reactive({ running: 0 });
+
+        const multiApprovalDialog = reactive({
+            visible: false, node: null, process: null,
+            approval: 'approved', comment: '', loading: false, title: '审批确认'
+        });
+
+        // ===== 工具函数 =====
+        const formatTime = (t) => {
+            if (!t) return '-';
+            const d = new Date(t);
+            return d.toLocaleString('zh-CN', { hour12: false });
+        };
+
+        const switchTab = (tab) => {
+            activeTab.value = tab;
+        };
+
+        // ===== 展开/收起 =====
+        const toggleExpand = (type, id) => {
+            if (type === 'leave') {
+                leaveExpanded[id] = !leaveExpanded[id];
+            } else {
+                multiExpanded[id] = !multiExpanded[id];
+            }
+        };
+
+        // ===== 加载统计 =====
+        const loadStats = async () => {
+            try {
+                const [defRes, leaveAllRes, multiAllRes] = await Promise.all([
+                    axios.get('/flowable/definitions'),
+                    axios.get('/flowable/all'),
+                    axios.get('/flowable/multi/all')
+                ]);
+                stats.definitions = defRes.data.length;
+
+                const leaveAll = leaveAllRes.data;
+                const multiAll = multiAllRes.data;
+                const all = [...leaveAll, ...multiAll];
+
+                stats.running = all.filter(p => p.status === 'running').length;
+                stats.finished = all.filter(p => p.status === 'finished').length;
+
+                leaveStats.running = leaveAll.filter(p => p.status === 'running').length;
+                multiStats.running = multiAll.filter(p => p.status === 'running').length;
+
+                let pendingCount = 0;
+                all.forEach(p => {
+                    if (p.timeline) {
+                        pendingCount += p.timeline.filter(n => n.status === 'pending').length;
+                    }
+                });
+                stats.pending = pendingCount;
+            } catch (e) { console.error('加载统计失败', e); }
+        };
+
+        // ===== 加载请假流程 =====
+        const loadLeaveProcesses = async () => {
+            leaveLoading.value = true;
+            try {
+                const res = await axios.get('/flowable/all');
+                leaveProcesses.value = res.data;
+                res.data.forEach(p => {
+                    if (p.status === 'running') {
+                        leaveExpanded[p.processInstanceId] = true;
+                    }
+                });
+            } catch (e) { console.error(e); }
+            finally { leaveLoading.value = false; }
+        };
+
+        // ===== 加载多级审批流程 =====
+        const loadMultiProcesses = async () => {
+            multiLoading.value = true;
+            try {
+                const res = await axios.get('/flowable/multi/all');
+                multiProcesses.value = res.data;
+                res.data.forEach(p => {
+                    if (p.status === 'running') {
+                        multiExpanded[p.processInstanceId] = true;
+                    }
+                });
+            } catch (e) { console.error(e); }
+            finally { multiLoading.value = false; }
+        };
+
+        // ===== 启动请假流程 =====
+        const startLeaveProcess = async () => {
+            if (!leaveForm.applicantName || !leaveForm.reason) {
+                ElementPlus.ElMessage.warning('请填写完整信息');
+                return;
+            }
+            leaveStarting.value = true;
+            leaveStartResult.value = '';
+            try {
+                const res = await axios.post('/flowable/start', null, {
+                    params: {
+                        applicantName: leaveForm.applicantName,
+                        reason: leaveForm.reason,
+                        days: leaveForm.days
+                    }
+                });
+                leaveStartResult.value = `✅ 流程已启动！实例ID: ${res.data}`;
+                ElementPlus.ElMessage.success('请假流程启动成功');
+                await refreshAll();
+                showLeaveDiagram(res.data);
+            } catch (e) {
+                ElementPlus.ElMessage.error('启动失败: ' + (e.response?.data || e.message));
+            } finally { leaveStarting.value = false; }
+        };
+
+        // ===== 启动多级审批流程 =====
+        const startMultiProcess = async () => {
+            if (!multiForm.applicantName || !multiForm.reason) {
+                ElementPlus.ElMessage.warning('请填写完整信息');
+                return;
+            }
+            multiStarting.value = true;
+            multiStartResult.value = '';
+            try {
+                const res = await axios.post('/flowable/multi/start', null, {
+                    params: {
+                        applicantName: multiForm.applicantName,
+                        reason: multiForm.reason,
+                        days: multiForm.days
+                    }
+                });
+                multiStartResult.value = `✅ 流程已启动！实例ID: ${res.data}`;
+                ElementPlus.ElMessage.success('多级审批流程启动成功');
+                await refreshAll();
+                showMultiDiagram(res.data);
+            } catch (e) {
+                ElementPlus.ElMessage.error('启动失败: ' + (e.response?.data || e.message));
+            } finally { multiStarting.value = false; }
+        };
+
+        // ===== 请假流程 - 审批 =====
+        const quickApproveLeave = (node, approved, proc) => {
+            leaveApprovalDialog.node = node;
+            leaveApprovalDialog.process = proc;
+            leaveApprovalDialog.approved = approved;
+            leaveApprovalDialog.comment = '';
+            leaveApprovalDialog.title = `审批确认 - ${node.taskName}`;
+            leaveApprovalDialog.visible = true;
+        };
+
+        const submitLeaveApproval = async () => {
+            leaveApprovalDialog.loading = true;
+            try {
+                await axios.post('/flowable/complete', null, {
+                    params: {
+                        taskId: leaveApprovalDialog.node.taskId,
+                        approved: leaveApprovalDialog.approved,
+                        comment: leaveApprovalDialog.comment
+                    }
+                });
+                ElementPlus.ElMessage.success('审批完成');
+                leaveApprovalDialog.visible = false;
+                await refreshAll();
+            } catch (e) {
+                ElementPlus.ElMessage.error('审批失败: ' + (e.response?.data || e.message));
+            } finally { leaveApprovalDialog.loading = false; }
+        };
+
+        // ===== 多级审批流程 - 审批 =====
+        const quickApproveMulti = (node, approval, proc) => {
+            multiApprovalDialog.node = node;
+            multiApprovalDialog.process = proc;
+            multiApprovalDialog.approval = approval;
+            multiApprovalDialog.comment = '';
+            multiApprovalDialog.title = `审批确认 - ${node.taskName}`;
+            multiApprovalDialog.visible = true;
+        };
+
+        const submitMultiApproval = async () => {
+            multiApprovalDialog.loading = true;
+            try {
+                await axios.post('/flowable/multi/complete', null, {
+                    params: {
+                        taskId: multiApprovalDialog.node.taskId,
+                        approval: multiApprovalDialog.approval,
+                        comment: multiApprovalDialog.comment
+                    }
+                });
+                ElementPlus.ElMessage.success('审批完成');
+                multiApprovalDialog.visible = false;
+                await refreshAll();
+            } catch (e) {
+                ElementPlus.ElMessage.error('审批失败: ' + (e.response?.data || e.message));
+            } finally { multiApprovalDialog.loading = false; }
+        };
+
+        // ===== 查看流程图 =====
+        const showLeaveDiagram = (processInstanceId) => {
+            leaveHighlightInstance.value = processInstanceId;
+            leaveDiagramUrl.value = `/flowable/diagram?processInstanceId=${processInstanceId}&t=${Date.now()}`;
+            activeTab.value = 'leave';
+        };
+
+        const showMultiDiagram = (processInstanceId) => {
+            multiHighlightInstance.value = processInstanceId;
+            multiDiagramUrl.value = `/flowable/multi/diagram?processInstanceId=${processInstanceId}&t=${Date.now()}`;
+            activeTab.value = 'multi';
+        };
+
+        // ===== 刷新所有 =====
+        const refreshAll = async () => {
+            await Promise.all([loadStats(), loadLeaveProcesses(), loadMultiProcesses()]);
+        };
+
+        onMounted(() => {
+            refreshAll();
+        });
+
+        return {
+            activeTab, switchTab,
+            stats, leaveStats, multiStats,
+
+            // 请假
+            leaveDiagramUrl, leaveHighlightInstance,
+            leaveForm, leaveStarting, leaveStartResult,
+            leaveProcesses, leaveLoading, leaveExpanded,
+            leaveApprovalDialog,
+
+            // 多级
+            multiDiagramUrl, multiHighlightInstance,
+            multiForm, multiStarting, multiStartResult,
+            multiProcesses, multiLoading, multiExpanded,
+            multiApprovalDialog,
+
+            formatTime, toggleExpand,
+            startLeaveProcess, startMultiProcess,
+            quickApproveLeave, submitLeaveApproval,
+            quickApproveMulti, submitMultiApproval,
+            showLeaveDiagram, showMultiDiagram,
+            refreshAll
+        };
+    }
+});
+
+app.use(ElementPlus);
+app.mount('#app');
+</script>
+</body>
+</html>
