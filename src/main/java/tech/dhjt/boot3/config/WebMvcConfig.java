@@ -12,6 +12,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
-        registry.addViewController("/").setViewName("redirect:/flowable/index.html");
+        registry.addViewController("/").setViewName("redirect:/workflow/index.html");
     }
 }

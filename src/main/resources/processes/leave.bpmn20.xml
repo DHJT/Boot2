@@ -11,7 +11,7 @@
       </extensionElements>
     </startEvent>
     <!-- 提交申请（用户任务） -->
-    <userTask id="submitLeave" name="提交请假申请" flowable:assignee="${applicantName}" flowable:formKey="leaveForm" flowable:taskListenerType="create">
+    <userTask id="submitLeave" name="提交请假申请" flowable:assignee="${applicantName}" flowable:formKey="leaveForm">
       <extensionElements>
         <flowable:formProperty id="applicantName" name="申请人姓名" type="string"/>
         <flowable:formProperty id="reason" name="请假原因" type="string"/>

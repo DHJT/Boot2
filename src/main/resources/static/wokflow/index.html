@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>流程审批管理系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; font-size: 14px; }
+        .login-page { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .login-card { background: #fff; border-radius: 12px; padding: 40px; width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .login-card h1 { text-align: center; color: #1a1a2e; margin-bottom: 8px; font-size: 24px; }
+        .login-card .subtitle { text-align: center; color: #888; margin-bottom: 30px; font-size: 14px; }
+        .login-card .form-group { margin-bottom: 18px; }
+        .login-card label { display: block; margin-bottom: 6px; color: #555; font-weight: 500; }
+        .login-card input { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; transition: border .2s; }
+        .login-card input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
+        .login-card button { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: opacity .2s; }
+        .login-card button:hover { opacity: 0.9; }
+        .login-card .error { color: #e74c3c; background: #fdeaea; padding: 10px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; display: none; }
+        .login-card .demo-info { margin-top: 20px; padding: 12px; background: #f8f9fa; border-radius: 6px; font-size: 12px; color: #666; }
+        .login-card .demo-info code { background: #e9ecef; padding: 1px 6px; border-radius: 3px; }
+        
+        .app { display: none; }
+        .app-header { background: #fff; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 4px rgba(0,0,0,0.08); position: sticky; top: 0; z-index: 100; }
+        .app-header .logo { font-weight: 700; font-size: 18px; color: #667eea; }
+        .app-header .user-info { display: flex; align-items: center; gap: 12px; }
+        .app-header .user-info .name { font-weight: 500; }
+        .app-header .user-info .logout-btn { padding: 6px 16px; background: #f0f2f5; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; color: #666; }
+        .app-header .user-info .logout-btn:hover { background: #e6e8eb; }
+        
+        .app-body { display: flex; min-height: calc(100vh - 56px); }
+        .sidebar { width: 220px; background: #fff; border-right: 1px solid #f0f0f0; padding: 16px 0; }
+        .sidebar .nav-item { padding: 12px 24px; cursor: pointer; color: #555; transition: all .2s; display: flex; align-items: center; gap: 10px; font-size: 14px; border-left: 3px solid transparent; }
+        .sidebar .nav-item:hover { background: #f8f9ff; color: #667eea; }
+        .sidebar .nav-item.active { background: #f0f2ff; color: #667eea; border-left-color: #667eea; font-weight: 600; }
+        .sidebar .nav-item .icon { font-size: 18px; width: 24px; text-align: center; }
+
+        .main-content { flex: 1; padding: 24px; overflow-y: auto; }
+        .page-title { font-size: 20px; font-weight: 600; color: #1a1a2e; margin-bottom: 20px; }
+        .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 16px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; }
+        .card-title { font-size: 16px; font-weight: 600; color: #333; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+        th { background: #fafafa; font-weight: 600; color: #555; white-space: nowrap; }
+        td { color: #333; }
+        tr:hover { background: #f8f9ff; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+        .badge-success { background: #e6f7e6; color: #27ae60; }
+        .badge-warning { background: #fff8e6; color: #f39c12; }
+        .badge-info { background: #e6f3ff; color: #3498db; }
+        .badge-danger { background: #fdeaea; color: #e74c3c; }
+
+        .btn { padding: 8px 18px; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .2s; }
+        .btn-primary { background: #667eea; color: #fff; }
+        .btn-primary:hover { background: #5a6fd8; }
+        .btn-success { background: #27ae60; color: #fff; }
+        .btn-success:hover { background: #219150; }
+        .btn-warning { background: #f39c12; color: #fff; }
+        .btn-warning:hover { background: #d68910; }
+        .btn-danger { background: #e74c3c; color: #fff; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-sm { padding: 5px 12px; font-size: 12px; }
+        .btn-outline { background: transparent; border: 1px solid #ddd; color: #555; }
+        .btn-outline:hover { background: #f5f5f5; }
+        .action-btns { display: flex; gap: 6px; }
+        
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: #fff; border-radius: 12px; padding: 28px; width: 520px; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .modal h2 { margin-bottom: 20px; font-size: 18px; color: #1a1a2e; }
+        .modal .form-group { margin-bottom: 14px; }
+        .modal .form-group label { display: block; margin-bottom: 5px; font-weight: 500; color: #555; font-size: 13px; }
+        .modal .form-group input, .modal .form-group select, .modal .form-group textarea { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 13px; }
+        .modal .form-group input:focus, .modal .form-group select:focus { outline: none; border-color: #667eea; }
+        .modal .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
+        .modal .form-actions .btn { padding: 10px 24px; }
+
+        .timeline { padding: 0; }
+        .timeline-item { display: flex; gap: 14px; padding: 12px 0; position: relative; }
+        .timeline-item:not(:last-child)::before { content: ''; position: absolute; left: 11px; top: 36px; bottom: 0; width: 2px; background: #e8e8e8; }
+        .timeline-dot { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; }
+        .timeline-dot.completed { background: #27ae60; }
+        .timeline-dot.pending { background: #f39c12; }
+        .timeline-dot.rejected { background: #e74c3c; }
+        .timeline-content { flex: 1; }
+        .timeline-content .tl-title { font-weight: 600; font-size: 14px; color: #333; }
+        .timeline-content .tl-info { font-size: 12px; color: #888; margin-top: 2px; }
+        .timeline-content .tl-comment { background: #f8f9fa; padding: 8px 12px; border-radius: 6px; margin-top: 6px; font-size: 13px; color: #555; }
+
+        .toast { position: fixed; top: 24px; right: 24px; padding: 12px 24px; border-radius: 8px; color: #fff; font-size: 14px; z-index: 2000; opacity: 0; transition: opacity .3s, transform .3s; transform: translateY(-10px); }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast-success { background: #27ae60; }
+        .toast-error { background: #e74c3c; }
+        .toast-info { background: #3498db; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .stat-card .stat-value { font-size: 28px; font-weight: 700; color: #667eea; }
+        .stat-card .stat-label { color: #888; font-size: 13px; margin-top: 4px; }
+        .stat-card .stat-icon { float: right; font-size: 32px; opacity: 0.15; }
+
+        .tab-bar { display: flex; gap: 0; margin-bottom: 16px; background: #f0f2f5; border-radius: 8px; padding: 4px; }
+        .tab-item { padding: 8px 20px; cursor: pointer; border-radius: 6px; font-size: 13px; font-weight: 500; color: #666; transition: all .2s; }
+        .tab-item.active { background: #fff; color: #667eea; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .approval-btns { display: flex; gap: 8px; margin-top: 10px; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #aaa; }
+        .empty-state .big-icon { font-size: 48px; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+    <div class="login-page" id="loginPage">
+        <div class="login-card">
+            <h1>📋 流程审批系统</h1>
+            <p class="subtitle">请登录以访问管理平台</p>
+            <div class="error" id="loginError"></div>
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" id="loginUsername" placeholder="请输入用户名" value="admin">
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" id="loginPassword" placeholder="请输入密码" value="123456">
+            </div>
+            <button onclick="doLogin()">登 录</button>
+            <div class="demo-info">
+                <strong>演示账号：</strong><br>
+                管理员：<code>admin / 123456</code><br>
+                员工：<code>zhangsan / 123456</code><br>
+                经理：<code>lisi / 123456</code><br>
+                总监：<code>wangwu / 123456</code>
+            </div>
+        </div>
+    </div>
+
+    <div class="app" id="app">
+        <div class="app-header">
+            <div class="logo">📋 流程审批系统</div>
+            <div class="user-info">
+                <span>👤 <span class="name" id="displayName">--</span></span>
+                <span style="color:#888;font-size:12px" id="displayRoles"></span>
+                <button class="logout-btn" onclick="doLogout()">退出登录</button>
+            </div>
+        </div>
+        <div class="app-body">
+            <div class="sidebar">
+                <div class="nav-item active" onclick="switchTab('dashboard')">
+                    <span class="icon">📊</span> 控制台
+                </div>
+                <div class="nav-item" onclick="switchTab('processes')">
+                    <span class="icon">🔄</span> 流程管理
+                </div>
+                <div class="nav-item" onclick="switchTab('leave')">
+                    <span class="icon">📝</span> 请假审批
+                </div>
+                <div class="nav-item" onclick="switchTab('multilevel')">
+                    <span class="icon">🏗️</span> 多级审批
+                </div>
+                <div class="nav-item" onclick="switchTab('tasks')">
+                    <span class="icon">📌</span> 我的待办
+                </div>
+                <div class="nav-item" onclick="switchTab('users')">
+                    <span class="icon">👥</span> 用户管理
+                </div>
+                <div class="nav-item" onclick="switchTab('depts')">
+                    <span class="icon">🏢</span> 部门管理
+                </div>
+                <div class="nav-item" onclick="switchTab('roles')">
+                    <span class="icon">🔑</span> 角色管理
+                </div>
+                <div class="nav-item" onclick="switchTab('notifications')">
+                    <span class="icon">🔔</span> 通知中心
+                </div>
+            </div>
+            <div class="main-content" id="mainContent"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="modalContent"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ======== 状态管理 ========
+        let state = {
+            token: localStorage.getItem('token') || '',
+            user: JSON.parse(localStorage.getItem('user') || '{}'),
+        };
+
+        // const API_BASE = '/api';
+        const API_BASE = '';
+
+        // ======== 工具函数 ========
+        function $(id) { return document.getElementById(id); }
+
+        function showToast(msg, type = 'success') {
+            const t = $('toast');
+            t.textContent = msg;
+            t.className = 'toast toast-' + type + ' show';
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        function api(path, options = {}) {
+            const headers = { 'Content-Type': 'application/json', ...options.headers };
+            if (state.token) headers['Authorization'] = 'Bearer ' + state.token;
+            return fetch(API_BASE + path, { ...options, headers })
+                .then(res => {
+                    if (res.status === 401) { showToast('登录已过期，请重新登录', 'error'); doLogout(); throw new Error('Unauthorized'); }
+                    const ct = res.headers.get('content-type') || '';
+                    if (ct.includes('application/json')) return res.json();
+                    return res.text().then(t => { if (!res.ok) throw new Error(t); return t; });
+                });
+        }
+
+        function openModal(html) {
+            $('modalContent').innerHTML = html;
+            $('modalOverlay').classList.add('show');
+        }
+
+        function closeModal() { $('modalOverlay').classList.remove('show'); }
+        $('modalOverlay').onclick = e => { if (e.target === $('modalOverlay')) closeModal(); };
+
+        // ======== 登录/登出 ========
+        function doLogin() {
+            const username = $('loginUsername').value.trim();
+            const password = $('loginPassword').value.trim();
+            if (!username || !password) { showToast('请输入用户名和密码', 'error'); return; }
+            api('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) })
+                .then(data => {
+                    state.token = data.token;
+                    state.user = data;
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data));
+                    $('loginPage').style.display = 'none';
+                    $('app').style.display = 'block';
+                    $('displayName').textContent = data.name || data.username;
+                    $('displayRoles').textContent = (data.roles || []).join(', ');
+                    switchTab('dashboard');
+                    showToast('登录成功，欢迎回来');
+                })
+                .catch(err => {
+                    $('loginError').style.display = 'block';
+                    $('loginError').textContent = err.message || '登录失败';
+                });
+        }
+
+        function doLogout() {
+            state.token = '';
+            state.user = {};
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            $('app').style.display = 'none';
+            $('loginPage').style.display = 'flex';
+            $('loginError').style.display = 'none';
+        }
+
+        // 自动登录检查
+        if (state.token) {
+            api('/auth/me').then(() => {
+                $('loginPage').style.display = 'none';
+                $('app').style.display = 'block';
+                $('displayName').textContent = state.user.name || state.user.username;
+                $('displayRoles').textContent = (state.user.roles || []).join(', ');
+                switchTab('dashboard');
+            }).catch(() => doLogout());
+        }
+
+        // ======== Tab 切换 ========
+        function switchTab(tab) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelector(`.nav-item[onclick*="${tab}"]`)?.classList.add('active');
+            const renderers = { dashboard: renderDashboard, processes: renderProcesses, tasks: renderTasks, users: renderUsers, depts: renderDepts, roles: renderRoles, notifications: renderNotifications, leave: renderLeave, multilevel: renderMultiLevel };
+            (renderers[tab] || (() => {}))();
+        }
+
+        // ======== Dashboard 控制台 ========
+        function renderDashboard() {
+            const mc = $('mainContent');
+            const isAdmin = (state.user.roles || []).includes('ROLE_ADMIN');
+            mc.innerHTML = `
+                <div class="page-title">📊 控制台</div>
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat-card"><div class="stat-icon">🔄</div><div class="stat-value" id="statProcesses">-</div><div class="stat-label">流程总数</div></div>
+                    <div class="stat-card"><div class="stat-icon">📌</div><div class="stat-value" id="statTasks">-</div><div class="stat-label">我的待办</div></div>
+                    <div class="stat-card"><div class="stat-icon">🔔</div><div class="stat-value" id="statNotifs">-</div><div class="stat-label">未读通知</div></div>
+                    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value" id="statUsers">-</div><div class="stat-label">用户总数</div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">📋 最近流程</div><div><button class="btn btn-primary btn-sm" onclick="switchTab('processes')">查看全部</button></div></div>
+                    <div id="recentProcesses"><div class="empty-state">加载中...</div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">📌 我的待办</div><div><button class="btn btn-primary btn-sm" onclick="switchTab('tasks')">查看全部</button></div></div>
+                    <div id="recentTasks"><div class="empty-state">加载中...</div></div>
+                </div>
+            `;
+            // 加载统计数据
+            const username = state.user.username || state.user.name;
+            Promise.all([
+                api('/flowable/definitions').catch(() => []),
+                api('/flowable/tasks/all/' + encodeURIComponent(username)).catch(() => []),
+                api('/flowable/notifications/unread/count/' + state.user.id).catch(() => ({ count: 0 })),
+                api('/system/users').catch(() => []),
+                api('/flowable/all?t=' + Date.now()).catch(() => []),
+            ]).then(([defs, tasks, notifCount, users, allProcs]) => {
+                $('statProcesses').textContent = (defs.length || 0) + '/' + (allProcs.length || 0);
+                $('statTasks').textContent = tasks.length || 0;
+                $('statNotifs').textContent = notifCount.count || 0;
+                $('statUsers').textContent = users.length || 0;
+                // 最近流程
+                const recent = (allProcs || []).slice(0, 5);
+                $('recentProcesses').innerHTML = recent.length ? renderProcessTable(recent) : '<div class="empty-state">暂无流程数据</div>';
+                // 最近待办
+                const recentTasks = (tasks || []).slice(0, 5);
+                $('recentTasks').innerHTML = recentTasks.length ? renderTaskTable(recentTasks) : '<div class="empty-state">暂无待办任务</div>';
+            }).catch(() => {});
+        }
+
+        function renderProcessTable(procs) {
+            return `<table><thead><tr><th>流程ID</th><th>申请人</th><th>原因</th><th>天数</th><th>状态</th><th>时间</th></tr></thead><tbody>
+                ${procs.map(p => `<tr><td><code>${(p.processInstanceId||'').slice(0,8)}...</code></td><td>${p.applicantName||'-'}</td><td>${p.reason||'-'}</td><td>${p.days||'-'}</td><td><span class="badge ${p.status==='running'?'badge-warning':'badge-info'}">${p.status==='running'?'进行中':'已结束'}</span></td><td>${formatTime(p.startTime)}</td></tr>`).join('')}
+            </tbody></table>`;
+        }
+
+        function renderTaskTable(tasks) {
+            return `<table><thead><tr><th>任务ID</th><th>任务名称</th><th>申请人</th><th>原因</th><th>天数</th><th>创建时间</th><th>操作</th></tr></thead><tbody>
+                ${tasks.map(t => `<tr><td><code>${(t.taskId||'').slice(0,8)}...</code></td><td>${t.taskName||'-'}</td><td>${t.applicantName||'-'}</td><td>${t.reason||'-'}</td><td>${t.days||'-'}</td><td>${formatTime(t.createTime)}</td>
+                <td><div class="action-btns"><button class="btn btn-primary btn-sm" onclick="showProcessDetail('${t.processInstanceId}')">详情</button></div></td></tr>`).join('')}
+            </tbody></table>`;
+        }
+
+        function formatTime(t) { if (!t) return '-'; try { const d = new Date(t); return d.toLocaleString('zh-CN'); } catch(e) { return t; } }
+
+        // ======== 流程管理 ========
+        function renderProcesses() {
+            const mc = $('mainContent');
+            mc.innerHTML = `<div class="page-title">🔄 流程管理</div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">流程列表</div><div><button class="btn btn-primary btn-sm" onclick="deployProcess()">部署流程</button> <button class="btn btn-success btn-sm" onclick="showStartProcess()">发起流程</button></div></div>
+                    <div id="processList"><div class="empty-state">加载中...</div></div>
+                </div>`;
+            loadProcesses();
+        }
+
+        async function loadProcesses() {
+            try {
+                const allProcs = await api('/flowable/all?t=' + Date.now());
+                $('processList').innerHTML = allProcs.length ? `<table><thead><tr><th>流程ID</th><th>申请人</th><th>原因</th><th>天数</th><th>状态</th><th>开始时间</th><th>操作</th></tr></thead><tbody>
+                    ${allProcs.map(p => `<tr><td><code>${(p.processInstanceId||'').slice(0,8)}...</code></td><td>${p.applicantName||'-'}</td><td>${p.reason||'-'}</td><td>${p.days||'-'}</td><td><span class="badge ${p.status==='running'?'badge-warning':'badge-info'}">${p.status==='running'?'进行中':'已结束'}</span></td><td>${formatTime(p.startTime)}</td>
+                    <td><div class="action-btns"><button class="btn btn-primary btn-sm" onclick="showProcessDetail('${p.processInstanceId}')">详情</button> ${p.status==='running'?`<button class="btn btn-outline btn-sm" onclick="showProcessDiagram('${p.processInstanceId}')">流程图</button>`:''}</div></td></tr>`).join('')}
+                </tbody></table>` : '<div class="empty-state">暂无流程，请先部署并发起</div>';
+            } catch(e) { $('processList').innerHTML = '<div class="empty-state">加载失败</div>'; }
+        }
+
+        function deployProcess() {
+            api('/flowable/deploy', { method: 'POST' }).then(r => { showToast('请假流程已部署'); loadProcesses(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function showStartProcess() {
+            openModal(`<h2>🚀 发起请假流程</h2>
+                <div class="form-group"><label>申请人</label><input id="startApplicant" value="${state.user.name||state.user.username}"></div>
+                <div class="form-group"><label>请假原因</label><input id="startReason" placeholder="请输入请假原因"></div>
+                <div class="form-group"><label>天数</label><input id="startDays" type="number" value="3" min="1"></div>
+                <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doStartProcess()">提交申请</button></div>`);
+        }
+
+        function doStartProcess() {
+            const applicant = $('startApplicant').value;
+            const reason = $('startReason').value;
+            const days = parseInt($('startDays').value) || 1;
+            api('/flowable/start?applicantName='+encodeURIComponent(applicant)+'&reason='+encodeURIComponent(reason)+'&days='+days, { method: 'POST' })
+                .then(r => { showToast('流程已发起，实例ID: ' + r); closeModal(); loadProcesses(); })
+                .catch(e => showToast(e.message, 'error'));
+        }
+
+        // ======== 流程详情 ========
+        function showProcessDetail(processInstanceId) {
+            api('/flowable/detail/' + processInstanceId).then(data => {
+                const timeline = (data.timeline || []).map(t => {
+                    const approved = t.approved === true || t.approval === 'approved';
+                    const rejected = t.approved === false || t.approval === 'rejected';
+                    const dotClass = t.status === 'pending' ? 'pending' : (rejected ? 'rejected' : 'completed');
+                    const dotIcon = t.status === 'pending' ? '⏳' : (rejected ? '✕' : '✓');
+                    return `<div class="timeline-item">
+                        <div class="timeline-dot ${dotClass}">${dotIcon}</div>
+                        <div class="timeline-content">
+                            <div class="tl-title">${t.taskName||'-'} ${t.status === 'pending' ? '<span class="badge badge-warning">待审批</span>' : (rejected ? '<span class="badge badge-danger">拒绝</span>' : '<span class="badge badge-success">通过</span>')}</div>
+                            <div class="tl-info">处理人: ${t.assignee||'-'} | ${formatTime(t.time)}</div>
+                            ${t.comment ? '<div class="tl-comment">💬 ' + t.comment + '</div>' : ''}
+                            ${t.candidateGroups ? '<div class="tl-info">候选组: ' + t.candidateGroups.join(', ') + '</div>' : ''}
+                        </div>
+                    </div>`;
+                }).join('');
+
+                openModal(`<h2>📋 流程详情</h2>
+                    <div style="margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;font-size:13px;">
+                        <div><strong>流程ID：</strong><code>${data.processInstanceId}</code></div>
+                        <div><strong>申请人：</strong>${data.applicantName||'-'}</div>
+                        <div><strong>原因：</strong>${data.reason||'-'}</div>
+                        <div><strong>天数：</strong>${data.days||'-'}天</div>
+                        <div><strong>状态：</strong><span class="badge ${data.status==='running'?'badge-warning':'badge-info'}">${data.status==='running'?'进行中':'已结束'}</span></div>
+                    </div>
+                    <h3 style="margin-bottom:12px;font-size:15px;">⏱ 审批时间线</h3>
+                    <div class="timeline">${timeline || '<div class="empty-state">暂无审批记录</div>'}</div>
+                    <div class="form-actions"><button class="btn btn-primary" onclick="closeModal()">关闭</button></div>`);
+            }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function showProcessDiagram(processInstanceId) {
+            openModal(`<h2>📊 流程图</h2><div style="text-align:center;"><img src="${API_BASE}/flowable/diagram?processInstanceId=${processInstanceId}&t=${Date.now()}" style="max-width:100%;border-radius:8px;" onerror="this.parentElement.innerHTML='<div class=\\'empty-state\\'>无法加载流程图</div>'"></div>
+                <div class="form-actions"><button class="btn btn-primary" onclick="closeModal()">关闭</button></div>`);
+        }
+
+        // ======== 我的待办 ========
+        function renderTasks() {
+            const mc = $('mainContent');
+            const username = state.user.username || state.user.name;
+            mc.innerHTML = `<div class="page-title">📌 我的待办</div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">待办任务列表</div><div><button class="btn btn-outline btn-sm" onclick="renderTasks()">🔄 刷新</button></div></div>
+                    <div id="taskList"><div class="empty-state">加载中...</div></div>
+                </div>`;
+            api('/flowable/tasks/all/' + encodeURIComponent(username) + '?t=' + Date.now()).then(tasks => {
+                if (!tasks || !tasks.length) { $('taskList').innerHTML = '<div class="empty-state"><div class="big-icon">✅</div>暂无待办任务</div>'; return; }
+                $('taskList').innerHTML = `<table><thead><tr><th>任务ID</th><th>任务名称</th><th>申请人</th><th>原因</th><th>天数</th><th>创建时间</th><th>审批人</th><th>操作</th></tr></thead><tbody>
+                    ${tasks.map(t => `<tr><td><code>${(t.taskId||'').slice(0,8)}...</code></td><td>${t.taskName||'-'}</td><td>${t.applicantName||'-'}</td><td>${t.reason||'-'}</td><td>${t.days||'-'}</td><td>${formatTime(t.createTime)}</td><td>${t.assignee || '<span class="badge badge-warning">待认领</span>'}</td>
+                    <td><div class="action-btns"><button class="btn btn-success btn-sm" onclick="showApprove('${t.taskId}')">审批</button><button class="btn btn-primary btn-sm" onclick="showProcessDetail('${t.processInstanceId}')">详情</button></div></td></tr>`).join('')}
+                </tbody></table>`;
+            }).catch(e => { $('taskList').innerHTML = '<div class="empty-state">加载失败</div>'; });
+        }
+
+        function showApprove(taskId) {
+            openModal(`<h2>✏️ 审批任务</h2>
+                <div class="form-group"><label>审批意见</label><textarea id="approveComment" rows="3" placeholder="请输入审批意见"></textarea></div>
+                <div class="form-actions">
+                    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+                    <button class="btn btn-danger" onclick="doApprove('${taskId}','rejected')">驳回</button>
+                    <button class="btn btn-success" onclick="doApprove('${taskId}','approved')">通过</button>
+                </div>`);
+        }
+
+        function doApprove(taskId, approval) {
+            const comment = $('approveComment').value || (approval === 'approved' ? '同意' : '驳回');
+            api('/flowable/multi/complete?taskId='+taskId+'&approval='+approval+'&comment='+encodeURIComponent(comment), { method: 'POST' })
+                .then(r => { showToast('审批完成: ' + (approval==='approved'?'已通过':'已驳回')); closeModal(); renderTasks(); })
+                .catch(e => showToast(e.message, 'error'));
+        }
+
+        // ======== 用户管理 ========
+        let usersData = [];
+        function renderUsers() {
+            const mc = $('mainContent');
+            mc.innerHTML = `<div class="page-title">👥 用户管理</div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">用户列表</div><div><button class="btn btn-primary btn-sm" onclick="showAddUser()">+ 新增用户</button></div></div>
+                    <div id="usersTable"><div class="empty-state">加载中...</div></div>
+                </div>`;
+            api('/system/users').then(users => {
+                usersData = users || [];
+                $('usersTable').innerHTML = `<table><thead><tr><th>ID</th><th>用户名</th><th>姓名</th><th>邮箱</th><th>部门</th><th>职位</th><th>状态</th><th>操作</th></tr></thead><tbody>
+                    ${users.map(u => `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.name}</td><td>${u.email||'-'}</td><td>${u.deptName||'-'}</td><td>${u.position||'-'}</td><td><span class="badge ${u.enabled?'badge-success':'badge-danger'}">${u.enabled?'启用':'禁用'}</span></td>
+                    <td><div class="action-btns"><button class="btn btn-primary btn-sm" onclick="showEditUser(${u.id})">编辑</button><button class="btn btn-sm btn-success" onclick="showAssignRoles(${u.id})">角色</button><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">删除</button></div></td></tr>`).join('')}
+                </tbody></table>`;
+            }).catch(e => { $('usersTable').innerHTML = '<div class="empty-state">加载失败</div>'; });
+        }
+
+        function showAddUser() {
+            openModal(`<h2>👤 新增用户</h2>
+                <div class="form-group"><label>用户名 *</label><input id="editUsername"></div>
+                <div class="form-group"><label>姓名 *</label><input id="editName"></div>
+                <div class="form-group"><label>密码 *</label><input id="editPassword" type="password" value="123456"></div>
+                <div class="form-group"><label>邮箱</label><input id="editEmail"></div>
+                <div class="form-group"><label>部门</label><select id="editDeptId"><option value="">无</option></select></div>
+                <div class="form-group"><label>职位</label><input id="editPosition"></div>
+                <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doAddUser()">保存</button></div>`);
+            api('/system/depts').then(depts => {
+                const sel = $('editDeptId');
+                (depts||[]).forEach(d => { sel.innerHTML += `<option value="${d.id}">${d.name}</option>`; });
+            }).catch(()=>{});
+        }
+
+        function doAddUser() {
+            const user = { username: $('editUsername').value, name: $('editName').value, password: $('editPassword').value || '123456', email: $('editEmail').value, deptId: parseInt($('editDeptId').value)||null, position: $('editPosition').value, enabled: true };
+            api('/system/users', { method: 'POST', body: JSON.stringify(user) }).then(r => { showToast('用户创建成功'); closeModal(); renderUsers(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function showEditUser(id) {
+            const u = usersData.find(x => x.id === id);
+            if (!u) return;
+            openModal(`<h2>✏️ 编辑用户</h2>
+                <div class="form-group"><label>用户名</label><input id="editUsername" value="${u.username}"></div>
+                <div class="form-group"><label>姓名</label><input id="editName" value="${u.name||''}"></div>
+                <div class="form-group"><label>邮箱</label><input id="editEmail" value="${u.email||''}"></div>
+                <div class="form-group"><label>部门</label><select id="editDeptId"><option value="">无</option></select></div>
+                <div class="form-group"><label>职位</label><input id="editPosition" value="${u.position||''}"></div>
+                <div class="form-group"><label>是否启用</label><select id="editEnabled"><option value="true" ${u.enabled?'selected':''}>启用</option><option value="false" ${!u.enabled?'selected':''}>禁用</option></select></div>
+                <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doEditUser(${id})">保存</button></div>`);
+            api('/system/depts').then(depts => {
+                const sel = $('editDeptId');
+                (depts||[]).forEach(d => { sel.innerHTML += `<option value="${d.id}" ${d.id===u.deptId?'selected':''}>${d.name}</option>`; });
+            }).catch(()=>{});
+        }
+
+        function doEditUser(id) {
+            const user = { id, username: $('editUsername').value, name: $('editName').value, email: $('editEmail').value, deptId: parseInt($('editDeptId').value)||null, position: $('editPosition').value, enabled: $('editEnabled').value === 'true' };
+            api('/system/users', { method: 'PUT', body: JSON.stringify(user) }).then(r => { showToast('用户已更新'); closeModal(); renderUsers(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function deleteUser(id) {
+            if (!confirm('确认删除该用户？')) return;
+            api('/system/users/' + id, { method: 'DELETE' }).then(r => { showToast('用户已删除'); renderUsers(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function showAssignRoles(userId) {
+            api('/system/roles').then(roles => {
+                api('/system/users/'+userId+'/roles').then(userRoles => {
+                    const urIds = (userRoles||[]).map(r => r.id);
+                    const checks = (roles||[]).map(r => `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;"><input type="checkbox" class="role-check" value="${r.id}" ${urIds.includes(r.id)?'checked':''}> <span><strong>${r.name}</strong> <span style="color:#888">(${r.code})</span></span></label>`).join('');
+                    openModal(`<h2>🔑 分配角色</h2><div style="margin-bottom:12px;">${checks}</div>
+                        <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doAssignRoles(${userId})">保存</button></div>`);
+                });
+            }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function doAssignRoles(userId) {
+            const checked = Array.from(document.querySelectorAll('.role-check:checked')).map(c => parseInt(c.value));
+            api('/system/users/'+userId+'/roles', { method: 'POST', body: JSON.stringify(checked) }).then(r => { showToast('角色分配成功'); closeModal(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        // ======== 部门管理 ========
+        function renderDepts() {
+            const mc = $('mainContent');
+            mc.innerHTML = `<div class="page-title">🏢 部门管理</div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">部门列表</div><div><button class="btn btn-primary btn-sm" onclick="showAddDept()">+ 新增部门</button></div></div>
+                    <div id="deptsTable"><div class="empty-state">加载中...</div></div>
+                </div>`;
+            api('/system/depts').then(depts => {
+                $('deptsTable').innerHTML = `<table><thead><tr><th>ID</th><th>部门名称</th><th>编码</th><th>负责人</th><th>电话</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>
+                    ${(depts||[]).map(d => `<tr><td>${d.id}</td><td>${d.name}</td><td>${d.code||'-'}</td><td>${d.leader||'-'}</td><td>${d.phone||'-'}</td><td>${d.sortOrder||0}</td><td><span class="badge ${d.enabled?'badge-success':'badge-danger'}">${d.enabled?'启用':'禁用'}</span></td>
+                    <td><div class="action-btns"><button class="btn btn-primary btn-sm" onclick="showEditDept(${d.id})">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteDept(${d.id})">删除</button></div></td></tr>`).join('')}
+                </tbody></table>`;
+            }).catch(e => { $('deptsTable').innerHTML = '<div class="empty-state">加载失败</div>'; });
+        }
+
+        function showAddDept() {
+            openModal(`<h2>🏢 新增部门</h2>
+                <div class="form-group"><label>部门名称 *</label><input id="deptName"></div>
+                <div class="form-group"><label>部门编码</label><input id="deptCode"></div>
+                <div class="form-group"><label>负责人</label><input id="deptLeader"></div>
+                <div class="form-group"><label>电话</label><input id="deptPhone"></div>
+                <div class="form-group"><label>排序号</label><input id="deptSort" type="number" value="0"></div>
+                <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doAddDept()">保存</button></div>`);
+        }
+
+        function doAddDept() {
+            const dept = { name: $('deptName').value, code: $('deptCode').value, leader: $('deptLeader').value, phone: $('deptPhone').value, sortOrder: parseInt($('deptSort').value)||0, enabled: true };
+            api('/system/depts', { method: 'POST', body: JSON.stringify(dept) }).then(r => { showToast('部门创建成功'); closeModal(); renderDepts(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function showEditDept(id) {
+            api('/system/depts/'+id).then(d => {
+                openModal(`<h2>✏️ 编辑部门</h2>
+                    <div class="form-group"><label>部门名称</label><input id="deptName" value="${d.name||''}"></div>
+                    <div class="form-group"><label>部门编码</label><input id="deptCode" value="${d.code||''}"></div>
+                    <div class="form-group"><label>负责人</label><input id="deptLeader" value="${d.leader||''}"></div>
+                    <div class="form-group"><label>电话</label><input id="deptPhone" value="${d.phone||''}"></div>
+                    <div class="form-group"><label>排序号</label><input id="deptSort" type="number" value="${d.sortOrder||0}"></div>
+                    <div class="form-group"><label>是否启用</label><select id="deptEnabled"><option value="true" ${d.enabled?'selected':''}>启用</option><option value="false" ${!d.enabled?'selected':''}>禁用</option></select></div>
+                    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doEditDept(${id})">保存</button></div>`);
+            }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function doEditDept(id) {
+            const dept = { id, name: $('deptName').value, code: $('deptCode').value, leader: $('deptLeader').value, phone: $('deptPhone').value, sortOrder: parseInt($('deptSort').value)||0, enabled: $('deptEnabled').value === 'true' };
+            api('/system/depts', { method: 'PUT', body: JSON.stringify(dept) }).then(r => { showToast('部门已更新'); closeModal(); renderDepts(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function deleteDept(id) {
+            if (!confirm('确认删除该部门？')) return;
+            api('/system/depts/' + id, { method: 'DELETE' }).then(r => { showToast('部门已删除'); renderDepts(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        // ======== 角色管理 ========
+        function renderRoles() {
+            const mc = $('mainContent');
+            mc.innerHTML = `<div class="page-title">🔑 角色管理</div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">角色列表</div><div><button class="btn btn-primary btn-sm" onclick="showAddRole()">+ 新增角色</button></div></div>
+                    <div id="rolesTable"><div class="empty-state">加载中...</div></div>
+                </div>`;
+            api('/system/roles').then(roles => {
+                $('rolesTable').innerHTML = `<table><thead><tr><th>ID</th><th>角色名称</th><th>编码</th><th>描述</th><th>状态</th><th>操作</th></tr></thead><tbody>
+                    ${(roles||[]).map(r => `<tr><td>${r.id}</td><td>${r.name}</td><td><code>${r.code}</code></td><td>${r.description||'-'}</td><td><span class="badge ${r.enabled?'badge-success':'badge-danger'}">${r.enabled?'启用':'禁用'}</span></td>
+                    <td><div class="action-btns"><button class="btn btn-primary btn-sm" onclick="showEditRole(${r.id})">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteRole(${r.id})">删除</button></div></td></tr>`).join('')}
+                </tbody></table>`;
+            }).catch(e => { $('rolesTable').innerHTML = '<div class="empty-state">加载失败</div>'; });
+        }
+
+        function showAddRole() {
+            openModal(`<h2>🔑 新增角色</h2>
+                <div class="form-group"><label>角色名称 *</label><input id="roleName"></div>
+                <div class="form-group"><label>角色编码 *</label><input id="roleCode" placeholder="例如: ROLE_ADMIN"></div>
+                <div class="form-group"><label>描述</label><textarea id="roleDesc" rows="2"></textarea></div>
+                <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doAddRole()">保存</button></div>`);
+        }
+
+        function doAddRole() {
+            const role = { name: $('roleName').value, code: $('roleCode').value, description: $('roleDesc').value, enabled: true };
+            api('/system/roles', { method: 'POST', body: JSON.stringify(role) }).then(r => { showToast('角色创建成功'); closeModal(); renderRoles(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function showEditRole(id) {
+            api('/system/roles/'+id).then(r => {
+                openModal(`<h2>✏️ 编辑角色</h2>
+                    <div class="form-group"><label>角色名称</label><input id="roleName" value="${r.name||''}"></div>
+                    <div class="form-group"><label>角色编码</label><input id="roleCode" value="${r.code||''}"></div>
+                    <div class="form-group"><label>描述</label><textarea id="roleDesc" rows="2">${r.description||''}</textarea></div>
+                    <div class="form-group"><label>是否启用</label><select id="roleEnabled"><option value="true" ${r.enabled?'selected':''}>启用</option><option value="false" ${!r.enabled?'selected':''}>禁用</option></select></div>
+                    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="doEditRole(${id})">保存</button></div>`);
+            }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function doEditRole(id) {
+            const role = { id, name: $('roleName').value, code: $('roleCode').value, description: $('roleDesc').value, enabled: $('roleEnabled').value === 'true' };
+            api('/system/roles', { method: 'PUT', body: JSON.stringify(role) }).then(r => { showToast('角色已更新'); closeModal(); renderRoles(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function deleteRole(id) {
+            if (!confirm('确认删除该角色？')) return;
+            api('/system/roles/' + id, { method: 'DELETE' }).then(r => { showToast('角色已删除'); renderRoles(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        // ======== 通知中心 ========
+        function renderNotifications() {
+            const mc = $('mainContent');
+            mc.innerHTML = `<div class="page-title">🔔 通知中心</div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">我的通知</div><div><button class="btn btn-outline btn-sm" onclick="markAllRead()">全部已读</button> <button class="btn btn-outline btn-sm" onclick="renderNotifications()">🔄 刷新</button></div></div>
+                    <div id="notifList"><div class="empty-state">加载中...</div></div>
+                </div>`;
+            const userId = state.user.id;
+            api('/flowable/notifications/' + userId + '?t=' + Date.now()).then(notifs => {
+                if (!notifs || !notifs.length) { $('notifList').innerHTML = '<div class="empty-state"><div class="big-icon">🔔</div>暂无通知</div>'; return; }
+                $('notifList').innerHTML = `<table><thead><tr><th>标题</th><th>内容</th><th>类型</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody>
+                    ${notifs.map(n => `<tr><td><strong>${n.title||'-'}</strong></td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${n.content||'-'}</td><td><span class="badge badge-info">${n.type||'-'}</span></td><td><span class="badge ${n.read?'badge-success':'badge-warning'}">${n.read?'已读':'未读'}</span></td><td>${formatTime(n.createTime)}</td>
+                    <td>${!n.read?`<button class="btn btn-primary btn-sm" onclick="markRead(${n.id})">标为已读</button>`:'-'}</td></tr>`).join('')}
+                </tbody></table>`;
+            }).catch(e => { $('notifList').innerHTML = '<div class="empty-state">加载失败</div>'; });
+        }
+
+        function markRead(id) {
+            api('/flowable/notifications/read/' + id, { method: 'POST' }).then(() => { showToast('已标记为已读'); renderNotifications(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        function markAllRead() {
+            api('/flowable/notifications/read/all/' + state.user.id, { method: 'POST' }).then(() => { showToast('全部已标记为已读'); renderNotifications(); }).catch(e => showToast(e.message, 'error'));
+        }
+
+        // ======== 请假审批（由 leave.html 整合） ========
+        let leaveStats = { definitions: 0, running: 0, finished: 0, pending: 0 };
+        function renderLeave() {
+            const mc = $('mainContent');
+            mc.innerHTML = `
+                <div class="page-title">📝 请假审批</div>
+                <div class="stats-grid" id="leaveStatsGrid">
+                    <div class="stat-card"><div class="stat-icon">📄</div><div class="stat-value" id="leaveStatDefs">-</div><div class="stat-label">流程定义</div></div>
+                    <div class="stat-card"><div class="stat-icon">▶️</div><div class="stat-value" id="leaveStatRunning">-</div><div class="stat-label">运行中</div></div>
+                    <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value" id="leaveStatFinished">-</div><div class="stat-label">已完成</div></div>
+                    <div class="stat-card"><div class="stat-icon">📌</div><div class="stat-value" id="leaveStatPending">-</div><div class="stat-label">待办任务</div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">🚀 启动请假流程</div></div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+                        <div><label style="font-size:12px;color:#888;">申请人</label><br><input id="leaveApplicant" value="${state.user.name||state.user.username}" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px;width:120px;"></div>
+                        <div><label style="font-size:12px;color:#888;">请假原因</label><br><input id="leaveReason" placeholder="请输入原因" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px;width:180px;"></div>
+                        <div><label style="font-size:12px;color:#888;">天数</label><br><input id="leaveDays" type="number" value="3" min="1" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px;width:80px;"></div>
+                        <div><button class="btn btn-primary" onclick="doStartLeave()" style="margin-bottom:0;">提交申请</button></div>
+                    </div>
+                    <div id="leaveStartResult" style="margin-top:8px;"></div>
+                </div>
+                <div class="card" id="leaveProcessCard">
+                    <div class="card-header"><div class="card-title">📋 全部流程</div><div><button class="btn btn-outline btn-sm" onclick="renderLeave()">🔄 刷新</button></div></div>
+                    <div id="leaveProcessList"><div class="empty-state">加载中...</div></div>
+                </div>`;
+            loadLeaveData();
+        }
+
+        async function loadLeaveData() {
+            try {
+                const [defRes, allRes] = await Promise.all([
+                    api('/flowable/definitions').catch(() => []),
+                    api('/flowable/all?t=' + Date.now()).catch(() => [])
+                ]);
+                const all = allRes || [];
+                $('leaveStatDefs').textContent = (defRes||[]).length || 0;
+                $('leaveStatRunning').textContent = all.filter(p => p.status==='running').length;
+                $('leaveStatFinished').textContent = all.filter(p => p.status==='finished').length;
+                let pendingCount = 0;
+                all.forEach(p => { if (p.timeline) pendingCount += p.timeline.filter(n => n.status==='pending').length; });
+                $('leaveStatPending').textContent = pendingCount;
+                renderLeaveProcessList(all);
+            } catch(e) { $('leaveProcessList').innerHTML = '<div class="empty-state">加载失败</div>'; }
+        }
+
+        function renderLeaveProcessList(procs) {
+            if (!procs.length) { $('leaveProcessList').innerHTML = '<div class="empty-state">暂无流程，请先启动一个请假流程</div>'; return; }
+            $('leaveProcessList').innerHTML = procs.map(p => {
+                const expanded = 'leaveExp_' + p.processInstanceId;
+                const isExpanded = window[expanded] !== false;
+                return `<div class="process-card" style="border:1px solid #ebeef5;border-radius:8px;margin-bottom:12px;background:#fff;overflow:hidden;">
+                    <div class="process-card-header" style="padding:12px 16px;background:#f5f7fa;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ebeef5;cursor:pointer;" onclick="toggleLeaveExpand('${p.processInstanceId}')">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <span class="badge ${p.status==='running'?'badge-warning':'badge-info'}">${p.status==='running'?'运行中':'已结束'}</span>
+                            <div><strong style="font-size:14px;">${p.applicantName||'未知'} 的请假申请</strong>
+                            <div style="font-size:12px;color:#909399;margin-top:2px;">原因：${p.reason||'-'} · 天数：${p.days||'-'}天 · ${formatTime(p.startTime)}</div></div>
+                        </div>
+                        <div style="display:flex;gap:6px;">
+                            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();showDiagramLeave('${p.processInstanceId}')">流程图</button>
+                            <span style="font-size:12px;color:#909399;">${isExpanded?'收起':'展开'} ▼</span>
+                        </div>
+                    </div>
+                    <div id="leaveBody_${p.processInstanceId}" style="${isExpanded?'':'display:none;'}padding:12px 16px;">
+                        ${renderLeaveTimeline(p.timeline)}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleLeaveExpand(id) {
+            const body = $('leaveBody_' + id);
+            if (body) { body.style.display = body.style.display === 'none' ? '' : 'none'; }
+        }
+
+        function renderLeaveTimeline(timeline) {
+            if (!timeline || !timeline.length) return '<div style="color:#909399;text-align:center;padding:16px;">暂无审批记录</div>';
+            return `<div class="timeline">${timeline.map(t => {
+                const approved = t.approved === true || t.approval === 'approved';
+                const rejected = t.approved === false || t.approval === 'rejected';
+                const dotClass = t.status === 'pending' ? 'pending' : (rejected ? 'rejected' : 'completed');
+                const dotIcon = t.status === 'pending' ? '⏳' : (rejected ? '✕' : '✓');
+                return `<div class="timeline-item">
+                    <div class="timeline-dot ${dotClass}">${dotIcon}</div>
+                    <div class="timeline-content">
+                        <div class="tl-title">${t.taskName||'-'} ${t.status === 'pending' ? '<span class="badge badge-warning">待审批</span>' : (rejected ? '<span class="badge badge-danger">拒绝</span>' : '<span class="badge badge-success">通过</span>')}</div>
+                        <div class="tl-info">处理人: ${t.assignee||'-'} | ${formatTime(t.time)}</div>
+                        ${t.comment ? '<div class="tl-comment">💬 ' + t.comment + '</div>' : ''}
+                        ${t.candidateGroups ? '<div class="tl-info">候选组: ' + t.candidateGroups.join(', ') + '</div>' : ''}
+                        ${t.status === 'pending' && t.taskId ? '<div class="approval-btns"><button class="btn btn-success btn-sm" onclick="quickApproveLeave(\''+t.taskId+'\',true,\''+t.processInstanceId+'\')">✅ 同意</button><button class="btn btn-danger btn-sm" onclick="quickApproveLeave(\''+t.taskId+'\',false,\''+t.processInstanceId+'\')">❌ 拒绝</button></div>' : ''}
+                    </div>
+                </div>`;
+            }).join('')}</div>`;
+        }
+
+        function doStartLeave() {
+            const applicant = $('leaveApplicant').value;
+            const reason = $('leaveReason').value;
+            const days = parseInt($('leaveDays').value) || 1;
+            if (!reason) { showToast('请输入请假原因', 'error'); return; }
+            api('/flowable/start?applicantName='+encodeURIComponent(applicant)+'&reason='+encodeURIComponent(reason)+'&days='+days, { method: 'POST' })
+                .then(r => { showToast('流程已发起，实例ID: ' + r); renderLeave(); })
+                .catch(e => showToast(e.message, 'error'));
+        }
+
+        function showDiagramLeave(processInstanceId) {
+            showProcessDiagram(processInstanceId);
+        }
+
+        function quickApproveLeave(taskId, approved, processInstanceId) {
+            const approval = approved ? 'approved' : 'rejected';
+            const comment = approved ? '同意' : '驳回';
+            openModal(`<h2>✏️ 审批确认</h2>
+                <div class="form-group"><label>审批意见</label><textarea id="quickCommentLeave" rows="3" placeholder="请输入审批意见">${comment}</textarea></div>
+                <div class="form-actions">
+                    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+                    <button class="btn ${approved?'btn-success':'btn-danger'}" onclick="doQuickApproveLeave('${taskId}','${approval}')">确认${approved?'同意':'驳回'}</button>
+                </div>`);
+        }
+
+        function doQuickApproveLeave(taskId, approval) {
+            const comment = $('quickCommentLeave').value || (approval==='approved'?'同意':'驳回');
+            api('/flowable/complete?taskId='+taskId+'&approved='+(approval==='approved')+'&comment='+encodeURIComponent(comment), { method: 'POST' })
+                .then(r => { showToast('审批完成'); closeModal(); renderLeave(); })
+                .catch(e => showToast(e.message, 'error'));
+        }
+
+        // ======== 多级审批（由 multiLevelApprovalProcess.html 整合） ========
+        function renderMultiLevel() {
+            const mc = $('mainContent');
+            mc.innerHTML = `
+                <div class="page-title">🏗️ 多级审批</div>
+                <div class="stats-grid" id="multiStatsGrid">
+                    <div class="stat-card"><div class="stat-icon">📄</div><div class="stat-value" id="multiStatDefs">-</div><div class="stat-label">流程定义</div></div>
+                    <div class="stat-card"><div class="stat-icon">▶️</div><div class="stat-value" id="multiStatRunning">-</div><div class="stat-label">运行中</div></div>
+                    <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value" id="multiStatFinished">-</div><div class="stat-label">已完成</div></div>
+                    <div class="stat-card"><div class="stat-icon">📌</div><div class="stat-value" id="multiStatPending">-</div><div class="stat-label">待办任务</div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">🚀 启动多级审批流程</div></div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+                        <div><label style="font-size:12px;color:#888;">申请人</label><br><input id="multiApplicant" value="${state.user.name||state.user.username}" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px;width:120px;"></div>
+                        <div><label style="font-size:12px;color:#888;">申请原因</label><br><input id="multiReason" placeholder="请输入原因" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px;width:180px;"></div>
+                        <div><label style="font-size:12px;color:#888;">天数</label><br><input id="multiDays" type="number" value="5" min="1" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px;width:80px;"></div>
+                        <div><button class="btn btn-primary" onclick="doStartMulti()" style="margin-bottom:0;">提交申请</button></div>
+                    </div>
+                    <div id="multiStartResult" style="margin-top:8px;"></div>
+                </div>
+                <div class="card" id="multiProcessCard">
+                    <div class="card-header"><div class="card-title">📋 全部流程</div><div><button class="btn btn-outline btn-sm" onclick="renderMultiLevel()">🔄 刷新</button></div></div>
+                    <div id="multiProcessList"><div class="empty-state">加载中...</div></div>
+                </div>`;
+            loadMultiLevelData();
+        }
+
+        async function loadMultiLevelData() {
+            try {
+                const [defRes, allRes] = await Promise.all([
+                    api('/flowable/definitions').catch(() => []),
+                    api('/flowable/multi/all?t=' + Date.now()).catch(() => [])
+                ]);
+                const all = allRes || [];
+                $('multiStatDefs').textContent = (defRes||[]).length || 0;
+                $('multiStatRunning').textContent = all.filter(p => p.status==='running').length;
+                $('multiStatFinished').textContent = all.filter(p => p.status==='finished').length;
+                let pendingCount = 0;
+                all.forEach(p => { if (p.timeline) pendingCount += p.timeline.filter(n => n.status==='pending').length; });
+                $('multiStatPending').textContent = pendingCount;
+                renderMultiProcessList(all);
+            } catch(e) { $('multiProcessList').innerHTML = '<div class="empty-state">加载失败</div>'; }
+        }
+
+        function renderMultiProcessList(procs) {
+            if (!procs.length) { $('multiProcessList').innerHTML = '<div class="empty-state">暂无流程，请先启动一个多级审批流程</div>'; return; }
+            $('multiProcessList').innerHTML = procs.map(p => {
+                return `<div class="process-card" style="border:1px solid #ebeef5;border-radius:8px;margin-bottom:12px;background:#fff;overflow:hidden;">
+                    <div class="process-card-header" style="padding:12px 16px;background:#f5f7fa;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ebeef5;cursor:pointer;" onclick="toggleMultiExpand('${p.processInstanceId}')">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <span class="badge ${p.status==='running'?'badge-warning':'badge-info'}">${p.status==='running'?'运行中':'已结束'}</span>
+                            <div><strong style="font-size:14px;">${p.applicantName||'未知'} 的申请</strong>
+                            <div style="font-size:12px;color:#909399;margin-top:2px;">原因：${p.reason||'-'} · 天数：${p.days||'-'}天 · ${formatTime(p.startTime)}</div></div>
+                        </div>
+                        <div style="display:flex;gap:6px;">
+                            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();showDiagramMulti('${p.processInstanceId}')">流程图</button>
+                            <span style="font-size:12px;color:#909399;" id="multiExpandIcon_${p.processInstanceId}">展开 ▼</span>
+                        </div>
+                    </div>
+                    <div id="multiBody_${p.processInstanceId}" style="display:none;padding:12px 16px;">
+                        ${renderMultiTimeline(p.timeline)}
+                    </div>
+                </div>`;
+            }).join('');
+            // 默认展开运行中的流程
+            procs.forEach(p => { if (p.status === 'running') toggleMultiExpand(p.processInstanceId); });
+        }
+
+        function toggleMultiExpand(id) {
+            const body = $('multiBody_' + id);
+            const icon = $('multiExpandIcon_' + id);
+            if (body) {
+                const isHidden = body.style.display === 'none' || body.style.display === '';
+                body.style.display = isHidden ? '' : 'none';
+                if (icon) icon.textContent = isHidden ? '收起 ▲' : '展开 ▼';
+            }
+        }
+
+        function renderMultiTimeline(timeline) {
+            if (!timeline || !timeline.length) return '<div style="color:#909399;text-align:center;padding:16px;">暂无审批记录</div>';
+            return `<div class="timeline">${timeline.map(t => {
+                const rejected = t.approval === 'rejected';
+                const approved = t.approval === 'approved';
+                const dotClass = t.status === 'pending' ? 'pending' : (rejected ? 'rejected' : 'completed');
+                const dotIcon = t.status === 'pending' ? '⏳' : (rejected ? '✕' : '✓');
+                return `<div class="timeline-item">
+                    <div class="timeline-dot ${dotClass}">${dotIcon}</div>
+                    <div class="timeline-content">
+                        <div class="tl-title">${t.taskName||'-'} ${t.status === 'pending' ? '<span class="badge badge-warning">待审批</span>' : (rejected ? '<span class="badge badge-danger">拒绝</span>' : '<span class="badge badge-success">通过</span>')}</div>
+                        <div class="tl-info">处理人: ${t.assignee||'-'} | ${formatTime(t.time)}</div>
+                        ${t.comment ? '<div class="tl-comment">💬 ' + t.comment + '</div>' : ''}
+                        ${t.candidateGroups ? '<div class="tl-info">候选组: ' + t.candidateGroups.join(', ') + '</div>' : ''}
+                        ${t.status === 'pending' && t.taskId ? '<div class="approval-btns"><button class="btn btn-success btn-sm" onclick="quickApproveMulti(\''+t.taskId+'\',\'approved\')">✅ 同意</button><button class="btn btn-danger btn-sm" onclick="quickApproveMulti(\''+t.taskId+'\',\'rejected\')">❌ 拒绝</button></div>' : ''}
+                    </div>
+                </div>`;
+            }).join('')}</div>`;
+        }
+
+        function doStartMulti() {
+            const applicant = $('multiApplicant').value;
+            const reason = $('multiReason').value;
+            const days = parseInt($('multiDays').value) || 1;
+            if (!reason) { showToast('请输入申请原因', 'error'); return; }
+            api('/flowable/multi/start?applicantName='+encodeURIComponent(applicant)+'&reason='+encodeURIComponent(reason)+'&days='+days, { method: 'POST' })
+                .then(r => { showToast('多级审批流程已发起，实例ID: ' + r); renderMultiLevel(); })
+                .catch(e => showToast(e.message, 'error'));
+        }
+
+        function showDiagramMulti(processInstanceId) {
+            openModal(`<h2>📊 流程图</h2><div style="text-align:center;"><img src="${API_BASE}/flowable/multi/diagram?processInstanceId=${processInstanceId}&t=${Date.now()}" style="max-width:100%;border-radius:8px;" onerror="this.parentElement.innerHTML='<div class=\\'empty-state\\'>无法加载流程图</div>'"></div>
+                <div class="form-actions"><button class="btn btn-primary" onclick="closeModal()">关闭</button></div>`);
+        }
+
+        function quickApproveMulti(taskId, approval) {
+            openModal(`<h2>✏️ 审批确认</h2>
+                <div class="form-group"><label>审批意见</label><textarea id="multiComment" rows="3" placeholder="请输入审批意见">${approval==='approved'?'同意':'驳回'}</textarea></div>
+                <div class="form-actions">
+                    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+                    <button class="btn ${approval==='approved'?'btn-success':'btn-danger'}" onclick="doQuickApproveMulti('${taskId}','${approval}')">确认${approval==='approved'?'同意':'驳回'}</button>
+                </div>`);
+        }
+
+        function doQuickApproveMulti(taskId, approval) {
+            const comment = $('multiComment').value || (approval==='approved'?'同意':'驳回');
+            api('/flowable/multi/complete?taskId='+taskId+'&approval='+approval+'&comment='+encodeURIComponent(comment), { method: 'POST' })
+                .then(r => { showToast('审批完成'); closeModal(); renderMultiLevel(); })
+                .catch(e => showToast(e.message, 'error'));
+        }
+
+        // ======== WebSocket 实时通知 ========
+        function connectWebSocket() {
+            if (!state.user.id) return;
+            const ws = new WebSocket(((location.protocol === 'https:') ? 'wss://' : 'ws://') + location.host + '/ws/notifications?userId=' + state.user.id);
+            ws.onmessage = function(e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'notification') {
+                        showToast('📩 ' + (data.notification?.title || '新通知'), 'info');
+                        // 如果有通知tab打开，刷新
+                        if (document.querySelector('.nav-item.active')?.textContent.includes('通知')) renderNotifications();
+                    }
+                } catch(ex) {}
+            };
+            ws.onclose = function() { setTimeout(connectWebSocket, 5000); };
+        }
+
+        // 启动 WebSocket
+        if (state.token) setTimeout(connectWebSocket, 1000);
+    </script>
+</body>
+</html>

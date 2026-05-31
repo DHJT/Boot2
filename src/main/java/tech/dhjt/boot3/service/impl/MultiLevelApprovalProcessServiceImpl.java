@@ -1,4 +1,4 @@
-package tech.dhjt.boot3.service.flowable;
+package tech.dhjt.boot3.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.flowable.bpmn.BpmnAutoLayout;
@@ -16,6 +16,7 @@ import org.flowable.task.api.history.HistoricTaskInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import tech.dhjt.boot3.service.MultiLevelApprovalProcessService;
 
 import java.io.InputStream;
 import java.util.*;
@@ -26,9 +27,9 @@ import java.util.stream.Collectors;
  */
 @RequiredArgsConstructor
 @Service
-public class MultiLevelApprovalProcessService {
+public class MultiLevelApprovalProcessServiceImpl implements MultiLevelApprovalProcessService {
 
-    private static final Logger log = LoggerFactory.getLogger(MultiLevelApprovalProcessService.class);
+    private static final Logger log = LoggerFactory.getLogger(MultiLevelApprovalProcessServiceImpl.class);
 
     /** 流程定义Key */
     public static final String PROCESS_KEY = "multiLevelApprovalProcess";
@@ -42,6 +43,7 @@ public class MultiLevelApprovalProcessService {
     /**
      * 部署流程定义
      */
+    @Override
     public void deployProcess() {
         repositoryService.createDeployment()
                 .name("多级复杂审批流程")
@@ -53,6 +55,7 @@ public class MultiLevelApprovalProcessService {
     /**
      * 启动多级审批流程
      */
+    @Override
     public String startProcess(String applicantName, String reason, Integer days) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("applicantName", applicantName);
@@ -78,6 +81,7 @@ public class MultiLevelApprovalProcessService {
     /**
      * 查询用户组待办任务
      */
+    @Override
     public List<Map<String, Object>> queryTasksByGroup(String candidateGroup) {
         List<Task> tasks = taskService.createTaskQuery()
                 .taskCandidateGroup(candidateGroup)
@@ -102,6 +106,7 @@ public class MultiLevelApprovalProcessService {
      * 审批任务（多级审批使用 approval=approved/rejected 字符串）
      * 注意：approval 作为流程变量（用于网关条件判断），同时保存为任务本地变量以便每个审批人独立记录
      */
+    @Override
     public void completeTask(String taskId, String approval, String comment) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("approval", approval);
@@ -120,6 +125,7 @@ public class MultiLevelApprovalProcessService {
      * 查询所有流程列表（运行中+已结束），每个流程包含审批时间线（按时间倒序）
      * 运行中的流程排在前面，按最后活跃时间倒序
      */
+    @Override
     public List<Map<String, Object>> queryAllProcesses() {
         List<Map<String, Object>> result = new ArrayList<>();
 
@@ -252,6 +258,7 @@ public class MultiLevelApprovalProcessService {
     /**
      * 获取流程图
      */
+    @Override
     public InputStream getProcessDiagram(String processInstanceId) {
         ProcessDefinition processDefinition;
         BpmnModel bpmnModel;
@@ -323,6 +330,7 @@ public class MultiLevelApprovalProcessService {
     /**
      * 查询流程审批明细（带审批时间线，按时间倒序）
      */
+    @Override
     public Map<String, Object> getProcessDetail(String processInstanceId) {
         Map<String, Object> result = new HashMap<>();
 

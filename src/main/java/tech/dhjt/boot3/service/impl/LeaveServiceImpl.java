@@ -1,4 +1,4 @@
-package tech.dhjt.boot3.service.flowable;
+package tech.dhjt.boot3.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.flowable.bpmn.BpmnAutoLayout;
@@ -16,6 +16,7 @@ import org.flowable.task.api.history.HistoricTaskInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import tech.dhjt.boot3.service.LeaveService;
 
 import java.io.InputStream;
 import java.util.*;
@@ -26,9 +27,9 @@ import java.util.stream.Collectors;
  */
 @RequiredArgsConstructor
 @Service
-public class LeaveService {
+public class LeaveServiceImpl implements LeaveService {
 
-    private static final Logger log = LoggerFactory.getLogger(LeaveService.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaveServiceImpl.class);
 
     /** 流程定义Key */
     public static final String PROCESS_KEY = "leaveProcess";
@@ -42,6 +43,7 @@ public class LeaveService {
     /**
      * 部署流程定义
      */
+    @Override
     public void deployProcess() {
         repositoryService.createDeployment()
                 .name("请假审批流程")
@@ -53,6 +55,7 @@ public class LeaveService {
     /**
      * 启动请假流程
      */
+    @Override
     public String startLeaveProcess(String applicantName, String reason, Integer days) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("applicantName", applicantName);
@@ -78,6 +81,7 @@ public class LeaveService {
     /**
      * 查询用户组待办任务
      */
+    @Override
     public List<Map<String, Object>> queryTasksByGroup(String candidateGroup) {
         List<Task> tasks = taskService.createTaskQuery()
                 .taskCandidateGroup(candidateGroup)
@@ -101,6 +105,7 @@ public class LeaveService {
     /**
      * 审批任务
      */
+    @Override
     public void completeTask(String taskId, Boolean approved, String comment) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("approved", approved);
@@ -118,6 +123,7 @@ public class LeaveService {
      * 查询所有流程列表（运行中+已结束），每个流程包含审批时间线（按时间倒序）
      * 运行中的流程排在前面，按最后活跃时间倒序
      */
+    @Override
     public List<Map<String, Object>> queryAllProcesses() {
         List<Map<String, Object>> result = new ArrayList<>();
 
@@ -250,6 +256,7 @@ public class LeaveService {
     /**
      * 获取流程图
      */
+    @Override
     public InputStream getProcessDiagram(String processInstanceId) {
         ProcessDefinition processDefinition;
         BpmnModel bpmnModel;
@@ -321,6 +328,7 @@ public class LeaveService {
     /**
      * 查询流程审批明细（带审批时间线，按时间倒序）
      */
+    @Override
     public Map<String, Object> getProcessDetail(String processInstanceId) {
         Map<String, Object> result = new HashMap<>();
 
@@ -380,9 +388,9 @@ public class LeaveService {
                     .taskId(t.getId())
                     .includeProcessVariables()
                     .singleResult();
-            if (completeTask != null && completeTask.getProcessVariables() != null) {
-                node.put("approved", completeTask.getProcessVariables().get("approved"));
-                node.put("comment", completeTask.getProcessVariables().get("comment"));
+            if (completeTask != null && completeTask.getTaskLocalVariables() != null) {
+                node.put("approved", completeTask.getTaskLocalVariables().get("approved"));
+                node.put("comment", completeTask.getTaskLocalVariables().get("comment"));
             } else {
                 node.put("approved", null);
                 node.put("comment", null);

@@ -65,6 +65,7 @@ management:
       exposure:
         include:
         - "*"
+        - "flowable"
   metrics:
     tags:
       application: ${spring.application.name}

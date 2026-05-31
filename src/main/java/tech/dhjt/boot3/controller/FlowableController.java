@@ -2,19 +2,26 @@ package tech.dhjt.boot3.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.flowable.engine.RepositoryService;
+import org.flowable.engine.RuntimeService;
+import org.flowable.engine.TaskService;
+import org.flowable.task.api.Task;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import tech.dhjt.boot3.model.dto.ProcessDefinitionDTO;
-import tech.dhjt.boot3.service.flowable.LeaveService;
-import tech.dhjt.boot3.service.flowable.MultiLevelApprovalProcessService;
+import tech.dhjt.boot3.model.po.Notification;
+import tech.dhjt.boot3.model.po.User;
+import tech.dhjt.boot3.service.MultiLevelApprovalProcessService;
+import tech.dhjt.boot3.service.NotificationService;
+import tech.dhjt.boot3.service.UserService;
+import tech.dhjt.boot3.service.impl.ApprovalEnhanceService;
+import tech.dhjt.boot3.service.LeaveService;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Flowable 工作流示例 — 请假审批流程 + 多级审批流程 REST API
+ * Flowable 工作流 REST API — 完整功能控制器
  */
 @RequiredArgsConstructor
 @RestController
@@ -22,12 +29,17 @@ import java.util.stream.Collectors;
 public class FlowableController {
 
     private final LeaveService leaveService;
-
     private final MultiLevelApprovalProcessService multiLevelApprovalProcessService;
-
     private final RepositoryService repositoryService;
+    private final RuntimeService runtimeService;
+    private final TaskService taskService;
+    private final ApprovalEnhanceService approvalEnhanceService;
+    private final UserService userService;
+    private final NotificationService notificationService;
 
-    // ===== 通用接口 =====
+    // =====================================================================
+    //  通用接口
+    // =====================================================================
 
     /**
      * 查询已部署的流程定义
@@ -43,20 +55,180 @@ public class FlowableController {
                 .collect(Collectors.toList());
     }
 
-    // ===== 请假流程 (leaveProcess) =====
+    // =====================================================================
+    //  用户登录 & 用户管理
+    // =====================================================================
 
     /**
-     * 手动部署请假流程
+     * 用户登录
      */
+    @PostMapping("/login")
+    public Map<String, Object> login(@RequestParam String username, @RequestParam String password) {
+        return userService.login(username, password);
+    }
+
+    /**
+     * 获取所有用户列表
+     */
+    @GetMapping("/users")
+    public List<User> getUsers() {
+        return userService.getAllUsers();
+    }
+
+    /**
+     * 按用户组查找用户
+     */
+    @GetMapping("/users/group/{groupId}")
+    public List<User> getUsersByGroup(@PathVariable String groupId) {
+        return userService.getUsersByGroup(groupId);
+    }
+
+    /**
+     * 按部门查找用户
+     */
+    @GetMapping("/users/dept/{deptId}")
+    public List<User> getUsersByDept(@PathVariable Long deptId) {
+        return userService.getUsersByDept(deptId);
+    }
+
+    // =====================================================================
+    //  通知接口
+    // =====================================================================
+
+    /**
+     * 获取用户未读通知
+     */
+    @GetMapping("/notifications/unread/{userId}")
+    public List<Notification> getUnreadNotifications(@PathVariable Long userId) {
+        return notificationService.getUnreadNotifications(userId);
+    }
+
+    /**
+     * 获取用户所有通知
+     */
+    @GetMapping("/notifications/{userId}")
+    public List<Notification> getAllNotifications(@PathVariable Long userId) {
+        return notificationService.getAllNotifications(userId);
+    }
+
+    /**
+     * 获取未读通知数量
+     */
+    @GetMapping("/notifications/unread/count/{userId}")
+    public Map<String, Long> getUnreadCount(@PathVariable Long userId) {
+        return Map.of("count", notificationService.getUnreadCount(userId));
+    }
+
+    /**
+     * 标记通知为已读
+     */
+    @PostMapping("/notifications/read/{notificationId}")
+    public String markAsRead(@PathVariable Long notificationId) {
+        notificationService.markAsRead(notificationId);
+        return "已标记为已读";
+    }
+
+    /**
+     * 标记用户所有通知为已读
+     */
+    @PostMapping("/notifications/read/all/{userId}")
+    public String markAllAsRead(@PathVariable Long userId) {
+        notificationService.markAllAsRead(userId);
+        return "全部已标记为已读";
+    }
+
+    // =====================================================================
+    //  待办任务查询
+    // =====================================================================
+
+    /**
+     * 查询用户待办任务（按审批人）
+     */
+    @GetMapping("/tasks/assignee/{assignee}")
+    public List<Map<String, Object>> getTasksByAssignee(@PathVariable String assignee) {
+        List<Task> tasks = taskService.createTaskQuery()
+                .taskAssignee(assignee)
+                .orderByTaskCreateTime().desc()
+                .list();
+
+        return tasks.stream().map(task -> {
+            Map<String, Object> info = new HashMap<>();
+            info.put("taskId", task.getId());
+            info.put("taskName", task.getName());
+            info.put("processInstanceId", task.getProcessInstanceId());
+            info.put("createTime", task.getCreateTime());
+            info.put("assignee", task.getAssignee());
+            info.put("taskDefinitionKey", task.getTaskDefinitionKey());
+            Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
+            info.put("applicantName", variables.get("applicantName"));
+            info.put("reason", variables.get("reason"));
+            info.put("days", variables.get("days"));
+            info.put("processKey", runtimeService.createProcessInstanceQuery()
+                    .processInstanceId(task.getProcessInstanceId())
+                    .singleResult()
+                    .getProcessDefinitionKey());
+            return info;
+        }).toList();
+    }
+
+    /**
+     * 查询用户的候选组待办任务
+     */
+    @GetMapping("/tasks/candidate/{username}")
+    public List<Map<String, Object>> getCandidateTasks(@PathVariable String username) {
+        User user = userService.getUserByUsername(username);
+        if (user == null) {
+            return List.of();
+        }
+
+        List<String> groups = user.getGroupList();
+        Set<Map<String, Object>> resultSet = new LinkedHashSet<>();
+
+        for (String group : groups) {
+            List<Task> tasks = taskService.createTaskQuery()
+                    .taskCandidateGroup(group)
+                    .orderByTaskCreateTime().desc()
+                    .list();
+            for (Task task : tasks) {
+                Map<String, Object> info = new HashMap<>();
+                info.put("taskId", task.getId());
+                info.put("taskName", task.getName());
+                info.put("processInstanceId", task.getProcessInstanceId());
+                info.put("createTime", task.getCreateTime());
+                info.put("candidateGroup", group);
+                info.put("assignee", task.getAssignee());
+                Map<String, Object> variables = runtimeService.getVariables(task.getProcessInstanceId());
+                info.put("applicantName", variables.get("applicantName"));
+                info.put("reason", variables.get("reason"));
+                info.put("days", variables.get("days"));
+                resultSet.add(info);
+            }
+        }
+
+        return new ArrayList<>(resultSet);
+    }
+
+    /**
+     * 查询用户的所有待办（个人+候选组）
+     */
+    @GetMapping("/tasks/all/{username}")
+    public List<Map<String, Object>> getAllMyTasks(@PathVariable String username) {
+        List<Map<String, Object>> allTasks = new ArrayList<>();
+        allTasks.addAll(getTasksByAssignee(username));
+        allTasks.addAll(getCandidateTasks(username));
+        return allTasks;
+    }
+
+    // =====================================================================
+    //  请假流程 (leaveProcess) 原接口保留
+    // =====================================================================
+
     @PostMapping("/deploy")
     public String deploy() {
         leaveService.deployProcess();
         return "请假流程已部署";
     }
 
-    /**
-     * 启动请假流程
-     */
     @PostMapping("/start")
     public String startLeave(@RequestParam String applicantName,
                              @RequestParam String reason,
@@ -64,17 +236,11 @@ public class FlowableController {
         return leaveService.startLeaveProcess(applicantName, reason, days);
     }
 
-    /**
-     * 按用户组查询请假待办任务
-     */
     @GetMapping("/tasks/{group}")
     public List<Map<String, Object>> getTasksByGroup(@PathVariable String group) {
         return leaveService.queryTasksByGroup(group);
     }
 
-    /**
-     * 审批请假任务（使用 boolean approved）
-     */
     @PostMapping("/complete")
     public String completeTask(@RequestParam String taskId,
                                @RequestParam Boolean approved,
@@ -83,25 +249,16 @@ public class FlowableController {
         return "任务已完成";
     }
 
-    /**
-     * 查询所有请假流程列表（运行中+已结束），每个流程附带审批时间线
-     */
     @GetMapping("/all")
     public List<Map<String, Object>> getAllProcesses() {
         return leaveService.queryAllProcesses();
     }
 
-    /**
-     * 获取请假流程审批明细
-     */
     @GetMapping("/detail/{processInstanceId}")
     public Map<String, Object> getProcessDetail(@PathVariable String processInstanceId) {
         return leaveService.getProcessDetail(processInstanceId);
     }
 
-    /**
-     * 获取流程图（默认请假流程）
-     */
     @GetMapping(value = "/diagram", produces = MediaType.IMAGE_PNG_VALUE)
     public ResponseEntity<byte[]> getDiagram(@RequestParam(required = false) String processInstanceId) {
         try {
@@ -115,20 +272,16 @@ public class FlowableController {
         }
     }
 
-    // ===== 多级复杂审批流程 (multiLevelApprovalProcess) =====
+    // =====================================================================
+    //  多级复杂审批流程 (multiLevelApprovalProcess) 原接口保留
+    // =====================================================================
 
-    /**
-     * 手动部署多级审批流程
-     */
     @PostMapping("/multi/deploy")
     public String deployMulti() {
         multiLevelApprovalProcessService.deployProcess();
         return "多级审批流程已部署";
     }
 
-    /**
-     * 启动多级审批流程
-     */
     @PostMapping("/multi/start")
     public String startMulti(@RequestParam String applicantName,
                              @RequestParam String reason,
@@ -136,17 +289,11 @@ public class FlowableController {
         return multiLevelApprovalProcessService.startProcess(applicantName, reason, days);
     }
 
-    /**
-     * 按用户组查询多级审批待办任务
-     */
     @GetMapping("/multi/tasks/{group}")
     public List<Map<String, Object>> getMultiTasksByGroup(@PathVariable String group) {
         return multiLevelApprovalProcessService.queryTasksByGroup(group);
     }
 
-    /**
-     * 审批多级审批任务（使用 String approval: 'approved'/'rejected'）
-     */
     @PostMapping("/multi/complete")
     public String completeMultiTask(@RequestParam String taskId,
                                     @RequestParam String approval,
@@ -155,25 +302,16 @@ public class FlowableController {
         return "任务已完成";
     }
 
-    /**
-     * 查询所有多级审批流程列表
-     */
     @GetMapping("/multi/all")
     public List<Map<String, Object>> getAllMultiProcesses() {
         return multiLevelApprovalProcessService.queryAllProcesses();
     }
 
-    /**
-     * 获取多级审批流程明细
-     */
     @GetMapping("/multi/detail/{processInstanceId}")
     public Map<String, Object> getMultiProcessDetail(@PathVariable String processInstanceId) {
         return multiLevelApprovalProcessService.getProcessDetail(processInstanceId);
     }
 
-    /**
-     * 获取多级审批流程图
-     */
     @GetMapping(value = "/multi/diagram", produces = MediaType.IMAGE_PNG_VALUE)
     public ResponseEntity<byte[]> getMultiDiagram(@RequestParam(required = false) String processInstanceId) {
         try {
@@ -185,5 +323,120 @@ public class FlowableController {
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    // =====================================================================
+    //  审批增强接口 — 逐级回退、驳回重提、转办、委派、加人
+    // =====================================================================
+
+    /**
+     * 逐级回退 - 回退到上一个审批节点
+     */
+    @PostMapping("/task/back")
+    public String backToPrevious(@RequestParam String taskId,
+                                 @RequestParam(required = false, defaultValue = "回退到上一级") String comment) {
+        approvalEnhanceService.backToPrevious(taskId, comment);
+        return "已回退到上一级审批节点";
+    }
+
+    /**
+     * 驳回重提 - 驳回回到提交人
+     */
+    @PostMapping("/task/reject")
+    public String rejectToSubmitter(@RequestParam String taskId,
+                                    @RequestParam(required = false, defaultValue = "审批不通过，请修改后重新提交") String comment) {
+        approvalEnhanceService.rejectToSubmitter(taskId, comment);
+        return "已驳回至提交人";
+    }
+
+    /**
+     * 转办 - 将任务转给指定用户（按用户名）
+     */
+    @PostMapping("/task/transfer")
+    public String transferTask(@RequestParam String taskId,
+                               @RequestParam String targetUserName) {
+        approvalEnhanceService.transferTaskByUserId(taskId, targetUserName);
+        return "任务已转办给: " + targetUserName;
+    }
+
+    /**
+     * 委派 - 将任务委派给指定用户处理（完成后回到委派人）
+     */
+    @PostMapping("/task/delegate")
+    public String delegateTask(@RequestParam String taskId,
+                               @RequestParam String delegateUserId) {
+        approvalEnhanceService.delegateTask(taskId, delegateUserId);
+        return "任务已委派";
+    }
+
+    /**
+     * 加人 - 在当前审批节点增加审批人
+     */
+    @PostMapping("/task/add-approver")
+    public String addApprover(@RequestParam String taskId,
+                              @RequestParam String newUserId) {
+        approvalEnhanceService.addApprover(taskId, newUserId);
+        return "已增加审批人";
+    }
+
+    /**
+     * 完成任务/解决委派任务
+     */
+    @PostMapping("/task/resolve")
+    public String resolveTask(@RequestParam String taskId,
+                              @RequestBody(required = false) Map<String, Object> variables) {
+        if (variables == null) {
+            variables = new HashMap<>();
+        }
+        approvalEnhanceService.resolveTask(taskId, variables);
+        return "任务已完成/已解决";
+    }
+
+    /**
+     * 获取运行中流程的当前任务列表
+     */
+    @GetMapping("/process/{processInstanceId}/tasks")
+    public List<Map<String, Object>> getProcessTasks(@PathVariable String processInstanceId) {
+        List<Task> tasks = taskService.createTaskQuery()
+                .processInstanceId(processInstanceId)
+                .list();
+
+        return tasks.stream().map(task -> {
+            Map<String, Object> info = new HashMap<>();
+            info.put("taskId", task.getId());
+            info.put("taskName", task.getName());
+            info.put("assignee", task.getAssignee());
+            info.put("owner", task.getOwner());
+            info.put("createTime", task.getCreateTime());
+            info.put("taskDefinitionKey", task.getTaskDefinitionKey());
+
+            // 候选人/组
+            List<Map<String, String>> candidates = taskService.getIdentityLinksForTask(task.getId()).stream()
+                    .map(link -> {
+                        Map<String, String> m = new HashMap<>();
+                        if (link.getUserId() != null) m.put("userId", link.getUserId());
+                        if (link.getGroupId() != null) m.put("groupId", link.getGroupId());
+                        return m;
+                    })
+                    .collect(Collectors.toList());
+            info.put("candidates", candidates);
+            return info;
+        }).toList();
+    }
+
+    /**
+     * 获取完整的待办统计信息
+     */
+    @GetMapping("/tasks/stats/{userId}")
+    public Map<String, Object> getTaskStats(@PathVariable Long userId) {
+        User user = userService.getUserById(userId);
+        if (user == null) {
+            return Map.of("error", "用户不存在");
+        }
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("unreadNotifications", notificationService.getUnreadCount(userId));
+        stats.put("totalTasks", getAllMyTasks(user.getName()).size());
+        return stats;
     }
 }
