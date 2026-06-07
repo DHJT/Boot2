@@ -38,7 +38,7 @@
 http://localhost:8080/doc.html
 
 2. Swagger 接口文档访问地址
-http://localhost:8080/swagger-ui/index.html
+http://localhost:8080/swagger-ui.html
 http://localhost:8080/swagger-ui/index.html
 
 ### 官方在 7.0.0 版本中已正式移除了传统的 Flowable UI 应用。

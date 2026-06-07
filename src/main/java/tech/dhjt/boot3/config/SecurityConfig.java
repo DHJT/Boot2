@@ -44,6 +44,7 @@ public class SecurityConfig {
             "/flowable/multi/start",
             "/flowable/multi/**",
             "/flowable/**",
+            "/flowable-rest/**",
     };
 
     @Bean
@@ -54,6 +55,7 @@ public class SecurityConfig {
                 .ignoringRequestMatchers(
                     AntPathRequestMatcher.antMatcher("/h2-console/**"),
                     AntPathRequestMatcher.antMatcher("/api/**")
+//                    AntPathRequestMatcher.antMatcher("/flowable-rest/**")// .requestMatchers("/flowable-rest/**").authenticated()
                 )
             )
             // 允许 H2 Console 使用 frame

@@ -22,4 +22,12 @@ public interface LeaveService {
     Map<String, Object> getProcessDetail(String processInstanceId);
 
     InputStream getProcessDiagram(String processInstanceId);
+
+    /**
+     * 获取流程图（支持指定格式）
+     *
+     * @param processInstanceId 流程实例ID（可为空，空时返回最新版本流程图）
+     * @param format            图片格式：png、jpg/jpeg、svg、gif 等
+     */
+    InputStream getProcessDiagram(String processInstanceId, String format);
 }

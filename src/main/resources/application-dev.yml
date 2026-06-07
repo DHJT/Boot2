@@ -44,6 +44,8 @@ springdoc:
 # knife4j的增强配置，不需要增强可以不配
 knife4j:
   enable: true
+  # 开启生产环境屏蔽
+  production: false
   setting:
     language: zh_cn
   
@@ -78,3 +80,10 @@ flowable:
   # 关闭自动部署，我们手动触发一次以确保最新
   check-process-definitions: true
   process-definition-location-prefix: classpath:/processes/
+#  idm-enabled: false          # 关闭 Flowable IDM 引擎
+#  idm-rest-enabled: false     # 不暴露 /identity/ 端点
+#  rest-api-enabled: true
+#  history-level: audit    # none, activity, audit, full
+#  app:
+#    servlet:
+#      path: /api/flowable   # 默认 /flowable-rest

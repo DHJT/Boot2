@@ -1,19 +1,18 @@
 package tech.dhjt.boot3.controller;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import tech.dhjt.boot3.model.po.User;
 import tech.dhjt.boot3.service.HomeService;
+
+import java.util.concurrent.*;
 
 @RestController
 @RequestMapping("/")
@@ -54,6 +53,25 @@ public class HomeController {
         float totalTime = (float)(System.currentTimeMillis() - start) / 1000;
         logger.info("total time: " + totalTime + " seconds");
         return future;
+    }
+
+    @Operation(summary = "普通body请求")
+    @PostMapping("/body")
+    public ResponseEntity<User> body(@RequestBody User fileResp){
+        return ResponseEntity.ok(fileResp);
+    }
+
+    @Operation(summary = "普通body请求+Param+Header+Path")
+    @Parameters({
+            @Parameter(name = "id",description = "文件id",in = ParameterIn.PATH),
+            @Parameter(name = "token",description = "请求token",required = true,in = ParameterIn.HEADER),
+            @Parameter(name = "name",description = "文件名称",required = true,in=ParameterIn.QUERY)
+    })
+    @PostMapping("/bodyParamHeaderPath/{id}")
+    public ResponseEntity<User> bodyParamHeaderPath(@PathVariable String id, @RequestHeader("token") String token,
+                                                    @RequestParam("name")String name, @RequestBody User fileResp) {
+        fileResp.setName(fileResp.getName() + ",receiveName:" + name + ",token:" + token + ",pathID:" + id);
+        return ResponseEntity.ok(fileResp);
     }
 
 }

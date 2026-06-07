@@ -1,5 +1,7 @@
 package tech.dhjt.boot3.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.RuntimeService;
@@ -11,12 +13,13 @@ import org.springframework.web.bind.annotation.*;
 import tech.dhjt.boot3.model.dto.ProcessDefinitionDTO;
 import tech.dhjt.boot3.model.po.Notification;
 import tech.dhjt.boot3.model.po.User;
+import tech.dhjt.boot3.service.LeaveService;
 import tech.dhjt.boot3.service.MultiLevelApprovalProcessService;
 import tech.dhjt.boot3.service.NotificationService;
 import tech.dhjt.boot3.service.UserService;
 import tech.dhjt.boot3.service.impl.ApprovalEnhanceService;
-import tech.dhjt.boot3.service.LeaveService;
 
+import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -26,6 +29,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/flowable")
+@Tag(name = "Flowable 工作流")
 public class FlowableController {
 
     private final LeaveService leaveService;
@@ -44,6 +48,7 @@ public class FlowableController {
     /**
      * 查询已部署的流程定义
      */
+    @Operation(summary = "查询已部署的流程定义")
     @GetMapping("/definitions")
     public List<ProcessDefinitionDTO> getDefinitions() {
         return repositoryService.createProcessDefinitionQuery()
@@ -147,9 +152,11 @@ public class FlowableController {
     @GetMapping("/tasks/assignee/{assignee}")
     public List<Map<String, Object>> getTasksByAssignee(@PathVariable String assignee) {
         List<Task> tasks = taskService.createTaskQuery()
-                .taskAssignee(assignee)
+//                .taskAssignee(assignee)
+                .taskCandidateOrAssigned(assignee)
                 .orderByTaskCreateTime().desc()
                 .list();
+//        taskService.createTaskQuery().taskCandidateOrAssigned()
 
         return tasks.stream().map(task -> {
             Map<String, Object> info = new HashMap<>();
@@ -259,13 +266,15 @@ public class FlowableController {
         return leaveService.getProcessDetail(processInstanceId);
     }
 
-    @GetMapping(value = "/diagram", produces = MediaType.IMAGE_PNG_VALUE)
-    public ResponseEntity<byte[]> getDiagram(@RequestParam(required = false) String processInstanceId) {
+    @GetMapping(value = "/diagram", produces = {MediaType.IMAGE_PNG_VALUE, MediaType.IMAGE_JPEG_VALUE, "image/svg+xml", MediaType.IMAGE_GIF_VALUE})
+    public ResponseEntity<byte[]> getDiagram(
+            @RequestParam(required = false) String processInstanceId,
+            @RequestParam(required = false, defaultValue = "png") String format) {
         try {
-            var inputStream = leaveService.getProcessDiagram(processInstanceId);
+            var inputStream = leaveService.getProcessDiagram(processInstanceId, format);
             byte[] imageBytes = inputStream.readAllBytes();
             return ResponseEntity.ok()
-                    .contentType(MediaType.IMAGE_PNG)
+                    .contentType(determineMediaType(format))
                     .body(imageBytes);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
@@ -312,13 +321,16 @@ public class FlowableController {
         return multiLevelApprovalProcessService.getProcessDetail(processInstanceId);
     }
 
-    @GetMapping(value = "/multi/diagram", produces = MediaType.IMAGE_PNG_VALUE)
-    public ResponseEntity<byte[]> getMultiDiagram(@RequestParam(required = false) String processInstanceId) {
+    @GetMapping(value = "/multi/diagram", produces = {MediaType.IMAGE_PNG_VALUE, MediaType.IMAGE_JPEG_VALUE, "image/svg+xml", MediaType.IMAGE_GIF_VALUE})
+    public ResponseEntity<byte[]> getMultiDiagram(
+            @RequestParam(required = false) String processInstanceId,
+            @RequestParam(required = false, defaultValue = "gif") String format,
+            @RequestParam(required = false, defaultValue = "completed") String highlightMode) {
         try {
-            var inputStream = multiLevelApprovalProcessService.getProcessDiagram(processInstanceId);
+            var inputStream = multiLevelApprovalProcessService.getProcessDiagram(processInstanceId, format, highlightMode);
             byte[] imageBytes = inputStream.readAllBytes();
             return ResponseEntity.ok()
-                    .contentType(MediaType.IMAGE_PNG)
+                    .contentType(determineMediaType(format))
                     .body(imageBytes);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
@@ -438,5 +450,56 @@ public class FlowableController {
         stats.put("unreadNotifications", notificationService.getUnreadCount(userId));
         stats.put("totalTasks", getAllMyTasks(user.getName()).size());
         return stats;
+    }
+
+    // =====================================================================
+    //  通用流程图查看接口
+    // =====================================================================
+
+    /**
+     * 通用流程图查看 - 根据流程定义Key获取流程图（支持多格式）
+     *
+     * @param processDefinitionKey 流程定义Key（如 leaveProcess、multiLevelApprovalProcess）
+     * @param processInstanceId    流程实例ID（可选，传入则高亮当前活动节点）
+     * @param format               图片格式：png（默认）、jpg/jpeg、svg、gif
+     */
+    @GetMapping(value = "/diagram/{processDefinitionKey}", produces = {MediaType.IMAGE_PNG_VALUE, MediaType.IMAGE_JPEG_VALUE, "image/svg+xml", MediaType.IMAGE_GIF_VALUE})
+    public ResponseEntity<byte[]> getProcessDiagramByKey(
+            @PathVariable String processDefinitionKey,
+            @RequestParam(required = false) String processInstanceId,
+            @RequestParam(required = false, defaultValue = "png") String format,
+            @RequestParam(required = false, defaultValue = "completed") String highlightMode) {
+        try {
+            InputStream inputStream;
+            // 根据流程定义Key路由到对应的Service
+            if ("leaveProcess".equals(processDefinitionKey)) {
+                inputStream = leaveService.getProcessDiagram(processInstanceId, format);
+            } else if ("multiLevelApprovalProcess".equals(processDefinitionKey)) {
+                inputStream = multiLevelApprovalProcessService.getProcessDiagram(processInstanceId, format, highlightMode);
+            } else {
+                return ResponseEntity.badRequest().build();
+            }
+            byte[] imageBytes = inputStream.readAllBytes();
+            return ResponseEntity.ok()
+                    .contentType(determineMediaType(format))
+                    .body(imageBytes);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * 根据格式字符串确定 MediaType
+     */
+    private MediaType determineMediaType(String format) {
+        if (format == null) {
+            return MediaType.IMAGE_PNG;
+        }
+        return switch (format.toLowerCase()) {
+            case "jpg", "jpeg" -> MediaType.IMAGE_JPEG;
+            case "svg" -> MediaType.valueOf("image/svg+xml");
+            case "gif" -> MediaType.IMAGE_GIF;
+            default -> MediaType.IMAGE_PNG;
+        };
     }
 }

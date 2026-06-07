@@ -258,6 +258,22 @@ public class LeaveServiceImpl implements LeaveService {
      */
     @Override
     public InputStream getProcessDiagram(String processInstanceId) {
+        return getProcessDiagram(processInstanceId, "jpg");
+    }
+
+    /**
+     * 获取流程图（支持指定格式）
+     */
+    @Override
+    public InputStream getProcessDiagram(String processInstanceId, String format) {
+        if (format == null || format.isEmpty()) {
+            format = "jpg";
+        }
+        // 标准化格式名：将 "jpeg" 统一为 "jpg"
+        if ("jpeg".equalsIgnoreCase(format)) {
+            format = "jpg";
+        }
+
         ProcessDefinition processDefinition;
         BpmnModel bpmnModel;
         List<String> highLightedActivities = new ArrayList<>();
@@ -320,7 +336,7 @@ public class LeaveServiceImpl implements LeaveService {
 
         ProcessDiagramGenerator generator = new DefaultProcessDiagramGenerator();
         return generator.generateDiagram(
-                bpmnModel, "jpg", highLightedActivities,
+                bpmnModel, format, highLightedActivities,
                 highLightedFlows, "宋体", "宋体", "宋体",
                 null, 1.0, true);
     }

@@ -260,51 +260,66 @@ public class MultiLevelApprovalProcessServiceImpl implements MultiLevelApprovalP
      */
     @Override
     public InputStream getProcessDiagram(String processInstanceId) {
-        ProcessDefinition processDefinition;
+        return getProcessDiagram(processInstanceId, "jpg");
+    }
+
+    /**
+     * 获取流程图（支持指定格式）<br>
+     * 默认使用 completed 高亮模式，保留向后兼容
+     */
+    @Override
+    public InputStream getProcessDiagram(String processInstanceId, String format) {
+        return getProcessDiagram(processInstanceId, format, "completed");
+    }
+
+    /**
+     * 获取流程图（支持高亮模式）
+     *
+     * @param processInstanceId 流程实例ID（可为空，空时返回最新版本流程图）
+     * @param format            图片格式：png、jpg/jpeg、svg、gif 等
+     * @param highlightMode     高亮模式：<br>
+     *                          - "all"       : 全部节点和连线高亮<br>
+     *                          - "completed" : 仅高亮已走过的节点和连线（默认）
+     */
+    @Override
+    public InputStream getProcessDiagram(String processInstanceId, String format, String highlightMode) {
+        if (format == null || format.isEmpty()) {
+            format = "jpg";
+        }
+        // 标准化格式名：将 "jpeg" 统一为 "jpg"
+        if ("jpeg".equalsIgnoreCase(format)) {
+            format = "jpg";
+        }
+        if (highlightMode == null || highlightMode.isEmpty()) {
+            highlightMode = "completed";
+        }
+
         BpmnModel bpmnModel;
         List<String> highLightedActivities = new ArrayList<>();
         List<String> highLightedFlows = new ArrayList<>();
 
+        // 1. 获取 BpmnModel 和流程实例信息
+        ProcessInstance pi = null;
+        HistoricProcessInstance hpi = null;
+
         if (processInstanceId != null && !processInstanceId.isEmpty()) {
-            ProcessInstance pi = runtimeService.createProcessInstanceQuery()
+            pi = runtimeService.createProcessInstanceQuery()
                     .processInstanceId(processInstanceId)
                     .singleResult();
 
-            HistoricProcessInstance hpi = null;
             if (pi == null) {
                 hpi = historyService.createHistoricProcessInstanceQuery()
                         .processInstanceId(processInstanceId)
                         .singleResult();
             }
+        }
 
-            if (pi != null) {
-                bpmnModel = repositoryService.getBpmnModel(pi.getProcessDefinitionId());
-                List<Task> tasks = taskService.createTaskQuery()
-                        .processInstanceId(processInstanceId)
-                        .list();
-                for (Task task : tasks) {
-                    highLightedActivities.add(task.getTaskDefinitionKey());
-                }
-            } else if (hpi != null) {
-                bpmnModel = repositoryService.getBpmnModel(hpi.getProcessDefinitionId());
-                List<HistoricActivityInstance> historicActivities = historyService
-                        .createHistoricActivityInstanceQuery()
-                        .processInstanceId(processInstanceId)
-                        .orderByHistoricActivityInstanceStartTime().asc()
-                        .finished()
-                        .list();
-                for (HistoricActivityInstance hai : historicActivities) {
-                    highLightedActivities.add(hai.getActivityId());
-                }
-            } else {
-                processDefinition = repositoryService.createProcessDefinitionQuery()
-                        .processDefinitionKey(PROCESS_KEY)
-                        .latestVersion()
-                        .singleResult();
-                bpmnModel = repositoryService.getBpmnModel(processDefinition.getId());
-            }
+        if (pi != null) {
+            bpmnModel = repositoryService.getBpmnModel(pi.getProcessDefinitionId());
+        } else if (hpi != null) {
+            bpmnModel = repositoryService.getBpmnModel(hpi.getProcessDefinitionId());
         } else {
-            processDefinition = repositoryService.createProcessDefinitionQuery()
+            ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery()
                     .processDefinitionKey(PROCESS_KEY)
                     .latestVersion()
                     .singleResult();
@@ -315,6 +330,16 @@ public class MultiLevelApprovalProcessServiceImpl implements MultiLevelApprovalP
             throw new RuntimeException("BPMN模型未找到");
         }
 
+        // 2. 根据高亮模式收集高亮节点和连线
+        if ("all".equalsIgnoreCase(highlightMode)) {
+            // ========== 全部高亮模式：所有节点 + 所有连线 ==========
+            collectAllElements(bpmnModel, highLightedActivities, highLightedFlows);
+        } else {
+            // ========== 已走过高亮模式（completed/默认） ==========
+            collectCompletedElements(bpmnModel, pi, hpi, highLightedActivities, highLightedFlows);
+        }
+
+        // 3. 布局及生成
         BpmnAutoLayout bpmnAutoLayout = new BpmnAutoLayout(bpmnModel);
         bpmnAutoLayout.setTaskHeight(120);
         bpmnAutoLayout.setTaskWidth(120);
@@ -322,9 +347,117 @@ public class MultiLevelApprovalProcessServiceImpl implements MultiLevelApprovalP
 
         ProcessDiagramGenerator generator = new DefaultProcessDiagramGenerator();
         return generator.generateDiagram(
-                bpmnModel, "jpg", highLightedActivities,
+                bpmnModel, format, highLightedActivities,
                 highLightedFlows, "宋体", "宋体", "宋体",
                 null, 1.0, true);
+    }
+
+    /**
+     * 收集 BPMN 模型中全部节点和连线（all 模式）
+     */
+    private void collectAllElements(BpmnModel bpmnModel,
+                                    List<String> highLightedActivities,
+                                    List<String> highLightedFlows) {
+        // 所有节点（FlowElement 中所有 activity-like 元素）
+        bpmnModel.getMainProcess().getFlowElements().forEach(fe -> {
+            if (fe instanceof org.flowable.bpmn.model.UserTask
+                    || fe instanceof org.flowable.bpmn.model.ServiceTask
+                    || fe instanceof org.flowable.bpmn.model.ScriptTask
+                    || fe instanceof org.flowable.bpmn.model.BusinessRuleTask
+                    || fe instanceof org.flowable.bpmn.model.ManualTask
+                    || fe instanceof org.flowable.bpmn.model.ReceiveTask
+                    || fe instanceof org.flowable.bpmn.model.SendTask
+                    || fe instanceof org.flowable.bpmn.model.StartEvent
+                    || fe instanceof org.flowable.bpmn.model.EndEvent
+                    || fe instanceof org.flowable.bpmn.model.ExclusiveGateway
+                    || fe instanceof org.flowable.bpmn.model.ParallelGateway
+                    || fe instanceof org.flowable.bpmn.model.InclusiveGateway
+                    || fe instanceof org.flowable.bpmn.model.BoundaryEvent
+                    || fe instanceof org.flowable.bpmn.model.IntermediateCatchEvent
+                    || fe instanceof org.flowable.bpmn.model.ThrowEvent) {
+                highLightedActivities.add(fe.getId());
+            }
+        });
+        // 所有连线（sequenceFlow）
+        bpmnModel.getMainProcess().getFlowElements().forEach(fe -> {
+            if (fe instanceof org.flowable.bpmn.model.SequenceFlow) {
+                highLightedFlows.add(fe.getId());
+            }
+        });
+    }
+
+    /**
+     * 收集已走过的节点和连线（completed 模式）
+     */
+    private void collectCompletedElements(BpmnModel bpmnModel,
+                                          ProcessInstance pi,
+                                          HistoricProcessInstance hpi,
+                                          List<String> highLightedActivities,
+                                          List<String> highLightedFlows) {
+        // 获取已完成的 HistoricActivityInstance，按开始时间升序
+        String procInstId = (pi != null) ? pi.getId()
+                : (hpi != null) ? hpi.getId() : null;
+
+        // 没有流程实例 → 无高亮
+        if (procInstId == null) {
+            return;
+        }
+
+        // 查询流程实例中所有已完成的 Activity（包括开始事件、用户任务、网关、结束事件等）
+        List<HistoricActivityInstance> completedActivities = historyService
+                .createHistoricActivityInstanceQuery()
+                .processInstanceId(procInstId)
+                .orderByHistoricActivityInstanceStartTime().asc()
+                .finished()
+                .list();
+
+        // 收集已完成的节点ID（去重）
+        Set<String> completedActivityIds = new LinkedHashSet<>();
+        for (HistoricActivityInstance hai : completedActivities) {
+            completedActivityIds.add(hai.getActivityId());
+        }
+        highLightedActivities.addAll(completedActivityIds);
+
+        // 收集已走过的连线：
+        // 根据已完成的 Activity 顺序推断出被执行的 sequenceFlow
+        // 将 completedActivities 按顺序两两配对，查找 BPMN 模型中连接它们的 sequenceFlow
+        if (!completedActivities.isEmpty()) {
+            Set<String> traversedFlowIds = new HashSet<>();
+            // 先按时间排序（已经按 startTime 升序）
+            List<HistoricActivityInstance> sorted = completedActivities;
+
+            for (int i = 0; i < sorted.size() - 1; i++) {
+                String fromId = sorted.get(i).getActivityId();
+                String toId = sorted.get(i + 1).getActivityId();
+                // 查找从 fromId 到 toId 的 sequenceFlow
+                findSequenceFlowsBetween(bpmnModel, fromId, toId, traversedFlowIds);
+            }
+
+            // 额外处理：开始事件前的入度连线无需处理
+            // 额外处理：开始事件到第一个 activity 的连线
+            // (已在上述循环中覆盖：startEvent -> firstActivity)
+
+            highLightedFlows.addAll(traversedFlowIds);
+        }
+
+        // 如果流程仍在运行中，不额外添加当前待办节点（completed 模式只展示已完成的）
+    }
+
+    /**
+     * 在 BPMN 模型中查找从 sourceId 到 targetId 的所有 sequenceFlow（支持网关条件连线）
+     * 并将找到的连线ID加入 traversedFlows
+     */
+    private void findSequenceFlowsBetween(BpmnModel bpmnModel, String sourceId, String targetId,
+                                           Set<String> traversedFlows) {
+        // 查找 BPMN 主流程中所有 SequenceFlow
+        bpmnModel.getMainProcess().getFlowElements().forEach(fe -> {
+            if (fe instanceof org.flowable.bpmn.model.SequenceFlow) {
+                org.flowable.bpmn.model.SequenceFlow sf = (org.flowable.bpmn.model.SequenceFlow) fe;
+                if (sourceId.equals(sf.getSourceRef()) && targetId.equals(sf.getTargetRef())) {
+                    traversedFlows.add(sf.getId());
+                }
+            }
+        });
     }
 
     /**
