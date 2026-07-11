@@ -1,5 +1,8 @@
 package tech.dhjt.boot3.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -21,6 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/system")
+@Tag(name = "系统管理", description = "部门、角色、用户的管理接口")
 public class SystemController {
 
     private static final Logger log = LoggerFactory.getLogger(SystemController.class);
@@ -33,28 +37,33 @@ public class SystemController {
     //  部门管理
     // =====================================================================
 
+    @Operation(summary = "查询所有部门列表")
     @GetMapping("/depts")
     public List<Dept> getDepts() {
         return deptService.getAllDepts();
     }
 
+    @Operation(summary = "根据ID查询部门")
     @GetMapping("/depts/{id}")
-    public Dept getDept(@PathVariable Long id) {
+    public Dept getDept(@Parameter(description = "部门ID") @PathVariable Long id) {
         return deptService.getDeptById(id);
     }
 
+    @Operation(summary = "创建部门")
     @PostMapping("/depts")
     public Dept createDept(@RequestBody Dept dept) {
         return deptService.createDept(dept);
     }
 
+    @Operation(summary = "更新部门")
     @PutMapping("/depts")
     public Dept updateDept(@RequestBody Dept dept) {
         return deptService.updateDept(dept);
     }
 
+    @Operation(summary = "删除部门")
     @DeleteMapping("/depts/{id}")
-    public String deleteDept(@PathVariable Long id) {
+    public String deleteDept(@Parameter(description = "部门ID") @PathVariable Long id) {
         deptService.deleteDept(id);
         return "部门已删除";
     }
@@ -63,45 +72,48 @@ public class SystemController {
     //  角色管理
     // =====================================================================
 
+    @Operation(summary = "查询所有角色列表")
     @GetMapping("/roles")
     public List<Role> getRoles() {
         return roleService.getAllRoles();
     }
 
+    @Operation(summary = "根据ID查询角色")
     @GetMapping("/roles/{id}")
-    public Role getRole(@PathVariable Long id) {
+    public Role getRole(@Parameter(description = "角色ID") @PathVariable Long id) {
         return roleService.getRoleById(id);
     }
 
+    @Operation(summary = "创建角色")
     @PostMapping("/roles")
     public Role createRole(@RequestBody Role role) {
         return roleService.createRole(role);
     }
 
+    @Operation(summary = "更新角色")
     @PutMapping("/roles")
     public Role updateRole(@RequestBody Role role) {
         return roleService.updateRole(role);
     }
 
+    @Operation(summary = "删除角色")
     @DeleteMapping("/roles/{id}")
-    public String deleteRole(@PathVariable Long id) {
+    public String deleteRole(@Parameter(description = "角色ID") @PathVariable Long id) {
         roleService.deleteRole(id);
         return "角色已删除";
     }
 
-    /**
-     * 获取用户角色
-     */
+    @Operation(summary = "获取用户角色", description = "查询指定用户的所有角色")
     @GetMapping("/users/{userId}/roles")
-    public List<Role> getUserRoles(@PathVariable Long userId) {
+    public List<Role> getUserRoles(@Parameter(description = "用户ID") @PathVariable Long userId) {
         return roleService.getUserRoles(userId);
     }
 
-    /**
-     * 分配用户角色
-     */
+    @Operation(summary = "分配用户角色", description = "为用户分配多个角色")
     @PostMapping("/users/{userId}/roles")
-    public String assignUserRoles(@PathVariable Long userId, @RequestBody List<Long> roleIds) {
+    public String assignUserRoles(
+            @Parameter(description = "用户ID") @PathVariable Long userId,
+            @Parameter(description = "角色ID列表") @RequestBody List<Long> roleIds) {
         roleService.assignRolesToUser(userId, roleIds);
         return "角色分配成功";
     }
@@ -110,37 +122,40 @@ public class SystemController {
     //  用户管理
     // =====================================================================
 
+    @Operation(summary = "查询所有用户列表")
     @GetMapping("/users")
     public List<User> getUsers() {
         return userService.getAllUsers();
     }
 
+    @Operation(summary = "根据ID查询用户")
     @GetMapping("/users/{id}")
-    public User getUser(@PathVariable Long id) {
+    public User getUser(@Parameter(description = "用户ID") @PathVariable Long id) {
         return userService.getUserById(id);
     }
 
+    @Operation(summary = "创建用户")
     @PostMapping("/users")
     public User createUser(@RequestBody User user) {
         return userService.createUser(user);
     }
 
+    @Operation(summary = "更新用户")
     @PutMapping("/users")
     public User updateUser(@RequestBody User user) {
         return userService.updateUser(user);
     }
 
+    @Operation(summary = "删除用户")
     @DeleteMapping("/users/{id}")
-    public String deleteUser(@PathVariable Long id) {
+    public String deleteUser(@Parameter(description = "用户ID") @PathVariable Long id) {
         userService.deleteUser(id);
         return "用户已删除";
     }
 
-    /**
-     * 按部门查询用户
-     */
+    @Operation(summary = "按部门查询用户")
     @GetMapping("/users/dept/{deptId}")
-    public List<User> getUsersByDept(@PathVariable Long deptId) {
+    public List<User> getUsersByDept(@Parameter(description = "部门ID") @PathVariable Long deptId) {
         return userService.getUsersByDept(deptId);
     }
 

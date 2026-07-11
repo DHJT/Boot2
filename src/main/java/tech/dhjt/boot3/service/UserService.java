@@ -2,6 +2,7 @@ package tech.dhjt.boot3.service;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.flowable.idm.api.IdmIdentityService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -27,67 +28,90 @@ public class UserService {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final RoleService roleService;
+    private final IdmIdentityService idmIdentityService;
 
     /**
-     * 初始化演示用户数据
+     * 初始化用户数据（首次启动）并同步已存在的用户到 Flowable IDM
      */
     @PostConstruct
     @Transactional
     public void initDemoUsers() {
         if (userRepository.count() > 0) {
+            // 数据库已有数据，但也要确保这些用户已同步到 Flowable IDM
+            log.info("用户数据已存在，同步到 Flowable IDM...");
+            try {
+                syncUsersToIdm();
+            } catch (Exception e) {
+                log.warn("Flowable IDM 同步失败 (可能 IDM 未启用): {}", e.getMessage());
+            }
             return;
         }
 
         // 管理员
         userRepository.save(User.builder()
                 .username("admin").name("管理员").password("123456")
-                .email("admin@dhjt.tech").deptId(1L).deptName("技术部")
+                .email("admin@dhjt.tech").code("10001").companyName("中国石化").deptId(1L).deptName("技术部")
                 .position("系统管理员").groupIds("admin").enabled(true)
                 .build());
 
-        // 张三 - 普通员工
+        // 张三 - 辅导员审批人之一
         userRepository.save(User.builder()
                 .username("zhangsan").name("张三").password("123456")
-                .email("zhangsan@dhjt.tech").deptId(1L).deptName("技术部")
-                .position("开发工程师").groupIds("employee").managerId(2L).enabled(true)
+                .email("zhangsan@dhjt.tech").code("10002").companyName("中国石化").deptId(1L).deptName("技术部")
+                .position("辅导员").groupIds("employee,advisor").managerId(2L).enabled(true)
                 .build());
 
-        // 李四 - 部门经理
+        // 李四 - 辅导员审批人之一
         userRepository.save(User.builder()
                 .username("lisi").name("李四").password("123456")
-                .email("lisi@dhjt.tech").deptId(1L).deptName("技术部")
-                .position("部门经理").groupIds("management,advisor").managerId(3L).enabled(true)
+                .email("lisi@dhjt.tech").code("10003").companyName("中国石化").deptId(1L).deptName("技术部")
+                .position("辅导员").groupIds("management,advisor").managerId(3L).enabled(true)
                 .build());
 
         // 王五 - 总监
         userRepository.save(User.builder()
                 .username("wangwu").name("王五").password("123456")
-                .email("wangwu@dhjt.tech").deptId(2L).deptName("管理部")
+                .email("wangwu@dhjt.tech").code("10004").companyName("中国石化").deptId(2L).deptName("管理部")
                 .position("总监").groupIds("directors,dean").managerId(4L).enabled(true)
                 .build());
 
         // 赵六 - HR
         userRepository.save(User.builder()
                 .username("zhaoliu").name("赵六").password("123456")
-                .email("zhaoliu@dhjt.tech").deptId(3L).deptName("人力资源部")
+                .email("zhaoliu@dhjt.tech").code("10005").companyName("中国石化").deptId(3L).deptName("人力资源部")
                 .position("HR经理").groupIds("hr").managerId(3L).enabled(true)
                 .build());
 
         // 孙七 - 辅导员
         userRepository.save(User.builder()
                 .username("sunqi").name("孙七").password("123456")
-                .email("sunqi@dhjt.tech").deptId(4L).deptName("学生处")
+                .email("sunqi@dhjt.tech").code("10006").companyName("中国石化").deptId(4L).deptName("学生处")
                 .position("辅导员").groupIds("advisor").managerId(3L).enabled(true)
                 .build());
 
         // 周八 - 院长
         userRepository.save(User.builder()
                 .username("zhouba").name("周八").password("123456")
-                .email("zhouba@dhjt.tech").deptId(5L).deptName("院办")
+                .email("zhouba@dhjt.tech").code("10007").companyName("中国石化").deptId(5L).deptName("院办")
                 .position("院长").groupIds("dean,management").enabled(true)
                 .build());
 
         log.info("演示用户数据初始化完成（共 7 个用户）");
+
+        // 将所有用户同步到 Flowable IDM
+        syncUsersToIdm();
+    }
+
+    /**
+     * 将用户数据同步到 Flowable IDM 引擎
+     */
+    private void syncUsersToIdm() {
+        List<User> allUsers = userRepository.findAll();
+        log.info("开始同步 {} 个用户到 Flowable IDM...", allUsers.size());
+        for (User user : allUsers) {
+            syncSingleUserToIdm(user);
+        }
+        log.info("Flowable IDM 用户同步完成");
     }
 
     /**
@@ -126,6 +150,8 @@ public class UserService {
         result.put("username", user.getUsername());
         result.put("name", user.getName());
         result.put("email", user.getEmail());
+        result.put("code", user.getCode());
+        result.put("companyName", user.getCompanyName());
         result.put("deptId", user.getDeptId());
         result.put("deptName", user.getDeptName());
         result.put("position", user.getPosition());
@@ -173,7 +199,7 @@ public class UserService {
     }
 
     /**
-     * 创建用户
+     * 创建用户（同时同步到 Flowable IDM）
      */
     @Transactional
     public User createUser(User user) {
@@ -182,11 +208,13 @@ public class UserService {
         }
         User saved = userRepository.save(user);
         log.info("用户创建成功: id={}, username={}", saved.getId(), saved.getUsername());
+        // 同步到 Flowable IDM
+        syncSingleUserToIdm(saved);
         return saved;
     }
 
     /**
-     * 更新用户
+     * 更新用户（同时同步到 Flowable IDM）
      */
     @Transactional
     public User updateUser(User user) {
@@ -198,6 +226,8 @@ public class UserService {
         if (user.getName() != null) existing.setName(user.getName());
         if (user.getEmail() != null) existing.setEmail(user.getEmail());
         if (user.getPhone() != null) existing.setPhone(user.getPhone());
+        if (user.getCode() != null) existing.setCode(user.getCode());
+        if (user.getCompanyName() != null) existing.setCompanyName(user.getCompanyName());
         if (user.getDeptId() != null) existing.setDeptId(user.getDeptId());
         if (user.getDeptName() != null) existing.setDeptName(user.getDeptName());
         if (user.getPosition() != null) existing.setPosition(user.getPosition());
@@ -205,15 +235,53 @@ public class UserService {
         if (user.getGroupIds() != null) existing.setGroupIds(user.getGroupIds());
         if (user.getManagerId() != null) existing.setManagerId(user.getManagerId());
 
-        return userRepository.save(existing);
+        User updated = userRepository.save(existing);
+        // 同步到 Flowable IDM
+        syncSingleUserToIdm(updated);
+        return updated;
     }
 
     /**
-     * 删除用户
+     * 删除用户（同时从 Flowable IDM 删除）
      */
     @Transactional
     public void deleteUser(Long id) {
+        User user = userRepository.findById(id).orElse(null);
+        if (user != null) {
+            try {
+                org.flowable.idm.api.User idmUser = idmIdentityService.createUserQuery().userId(user.getUsername()).singleResult();
+                if (idmUser != null) {
+                    idmIdentityService.deleteUser(idmUser.getId());
+                    log.debug("已从 Flowable IDM 删除用户: {}", user.getUsername());
+                }
+            } catch (Exception e) {
+                log.warn("从 Flowable IDM 删除用户失败: {}", e.getMessage());
+            }
+        }
         userRepository.deleteById(id);
         log.info("用户已删除: id={}", id);
+    }
+
+    /**
+     * 将单个用户同步到 Flowable IDM
+     */
+    private void syncSingleUserToIdm(User user) {
+        try {
+            org.flowable.idm.api.User idmUser = idmIdentityService.createUserQuery().userId(user.getUsername()).singleResult();
+            boolean isNew = false;
+            if (idmUser == null) {
+                idmUser = idmIdentityService.newUser(user.getUsername());
+                isNew = true;
+            }
+            idmUser.setDisplayName(user.getName());
+            idmUser.setFirstName(user.getName());
+            idmUser.setLastName(user.getName());
+            idmUser.setEmail(user.getEmail());
+            idmUser.setPassword(user.getPassword());
+            idmIdentityService.saveUser(idmUser);
+            log.debug("已{} Flowable IDM 用户: {}", isNew ? "同步" : "更新", user.getUsername());
+        } catch (Exception e) {
+            log.warn("同步用户 {} 到 Flowable IDM 失败: {}", user.getUsername(), e.getMessage());
+        }
     }
 }

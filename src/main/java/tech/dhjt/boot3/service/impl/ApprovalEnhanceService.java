@@ -1,13 +1,9 @@
 package tech.dhjt.boot3.service.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
-import org.flowable.engine.history.HistoricProcessInstance;
-import org.flowable.identitylink.api.IdentityLinkInfo;
 import org.flowable.identitylink.api.IdentityLinkType;
-import org.flowable.identitylink.api.history.HistoricIdentityLink;
 import org.flowable.task.api.Task;
 import org.flowable.task.api.history.HistoricTaskInstance;
 import org.slf4j.Logger;
@@ -19,9 +15,12 @@ import tech.dhjt.boot3.event.NotificationEvent;
 import tech.dhjt.boot3.model.po.Notification;
 import tech.dhjt.boot3.model.po.User;
 import tech.dhjt.boot3.repository.UserRepository;
+import tech.dhjt.boot3.service.flowable.ProcessCommonService;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 审批增强服务 - 支持逐级回退、驳回重提、转办、委派、加人
@@ -34,161 +33,31 @@ public class ApprovalEnhanceService {
 
     private final TaskService taskService;
     private final RuntimeService runtimeService;
-    private final HistoryService historyService;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final ProcessCommonService processCommonService;
 
-    // ==================== 逐级回退 ====================
+    // ==================== 逐级回退（已废弃 - 请使用 ProcessCommonService.backToPrevious()） ====================
 
     /**
-     * 逐级回退 - 回退到上一个审批人/组
-     * 将当前任务回退到上一级已完成的任务节点，并重置其审批人为候选人或指定审批人
+     * @deprecated 请使用 {@link ProcessCommonService#backToPrevious(String, String)}
      */
+    @Deprecated
     @Transactional
     public void backToPrevious(String taskId, String comment) {
-        Task currentTask = taskService.createTaskQuery().taskId(taskId).singleResult();
-        if (currentTask == null) {
-            throw new RuntimeException("任务不存在: " + taskId);
-        }
-
-        String processInstanceId = currentTask.getProcessInstanceId();
-
-        // 获取当前任务的前一个已完成任务（按结束时间倒序，排除当前任务定义key相同的节点）
-        List<HistoricTaskInstance> completedTasks = historyService.createHistoricTaskInstanceQuery()
-                .processInstanceId(processInstanceId)
-                .finished()
-                .orderByHistoricTaskInstanceEndTime().desc()
-                .list();
-
-        // 找到上一个不同节点的已完成任务
-        HistoricTaskInstance previousTask = null;
-        String currentDefKey = currentTask.getTaskDefinitionKey();
-        for (HistoricTaskInstance ht : completedTasks) {
-            if (!ht.getTaskDefinitionKey().equals(currentDefKey)) {
-                previousTask = ht;
-                break;
-            }
-        }
-
-        if (previousTask == null) {
-            throw new RuntimeException("没有找到上一级审批节点，无法回退");
-        }
-
-        // 获取回退目标节点的候选组/候选人
-        List<String> candidateGroups = new ArrayList<>();
-        List<String> candidateUsers = new ArrayList<>();
-
-        // 从历史任务获取之前的审批人
-        if (previousTask.getAssignee() != null) {
-            candidateUsers.add(previousTask.getAssignee());
-        } else {
-            // 获取历史的候选人信息
-//            List<IdentityLinkInfo> identityLinks = historyService.getHistoricIdentityLinksForTask(previousTask.getId());
-            List<HistoricIdentityLink> identityLinks = historyService.getHistoricIdentityLinksForTask(previousTask.getId());
-            for (IdentityLinkInfo link : identityLinks) {
-                if (link.getGroupId() != null) {
-                    candidateGroups.add(link.getGroupId());
-                }
-                if (link.getUserId() != null) {
-                    candidateUsers.add(link.getUserId());
-                }
-            }
-        }
-
-        // 记录回退节点信息到流程变量
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("backToPreviousComment", comment);
-        variables.put("backToPreviousTaskKey", previousTask.getTaskDefinitionKey());
-        variables.put("backToPreviousTime", new Date());
-
-        // 使用 Flowable 的 changeActivityId 实现回退（需要启用流程实例的修改）
-        runtimeService.createChangeActivityStateBuilder()
-                .processInstanceId(processInstanceId)
-                .moveActivityIdTo(currentTask.getTaskDefinitionKey(), previousTask.getTaskDefinitionKey())
-                .changeState();
-
-        log.info("逐级回退成功: 任务 {} 从 {} 回退到 {}，意见: {}",
-                taskId, currentTask.getTaskDefinitionKey(), previousTask.getTaskDefinitionKey(), comment);
-
-        // 发送通知
-        sendBackNotification(processInstanceId, previousTask, comment, "逐级回退");
+        log.warn("【废弃】ApprovalEnhanceService.backToPrevious() 已废弃，委托给 ProcessCommonService");
+        processCommonService.backToPrevious(taskId, comment);
     }
 
-    // ==================== 驳回重提 ====================
+    // ==================== 驳回重提（委托给 ProcessCommonService.backToSubmitter()） ====================
 
     /**
      * 驳回重提 - 回退到提交人节点（流程发起人）
+     * 委托给 ProcessCommonService.backToSubmitter()
      */
     @Transactional
     public void rejectToSubmitter(String taskId, String comment) {
-        Task currentTask = taskService.createTaskQuery().taskId(taskId).singleResult();
-        if (currentTask == null) {
-            throw new RuntimeException("任务不存在: " + taskId);
-        }
-
-        String processInstanceId = currentTask.getProcessInstanceId();
-
-        // 获取流程发起人信息
-        HistoricProcessInstance hpi = historyService.createHistoricProcessInstanceQuery()
-                .processInstanceId(processInstanceId)
-                .singleResult();
-
-        // 获取流程变量中的 initiator/applicantName 作为提交人
-        String submitter = (String) runtimeService.getVariable(processInstanceId, "initiator");
-        if (submitter == null) {
-            submitter = (String) runtimeService.getVariable(processInstanceId, "applicantName");
-        }
-
-        // 找到提交申请节点的 taskDefinitionKey（通常是第一个用户任务）
-        // 先获取流程定义中的起始任务
-        List<HistoricTaskInstance> allTasks = historyService.createHistoricTaskInstanceQuery()
-                .processInstanceId(processInstanceId)
-                .orderByHistoricTaskInstanceStartTime().asc()
-                .list();
-
-        String submitTaskDefKey = null;
-        if (!allTasks.isEmpty()) {
-            // 第一个用户任务通常是提交申请任务
-            submitTaskDefKey = allTasks.get(0).getTaskDefinitionKey();
-        } else {
-            // 如果没有历史任务，尝试从当前运行中的任务判断
-            List<Task> runningTasks = taskService.createTaskQuery()
-                    .processInstanceId(processInstanceId)
-                    .orderByTaskCreateTime().asc()
-                    .list();
-            if (!runningTasks.isEmpty()) {
-                submitTaskDefKey = runningTasks.get(0).getTaskDefinitionKey();
-            }
-        }
-
-        if (submitTaskDefKey == null) {
-            throw new RuntimeException("无法找到提交节点，驳回重提失败");
-        }
-
-        // 设置流程变量标识被驳回
-        runtimeService.setVariable(processInstanceId, "rejected", true);
-        runtimeService.setVariable(processInstanceId, "rejectComment", comment);
-        runtimeService.setVariable(processInstanceId, "rejectTime", new Date());
-
-        // 移动当前活动到提交节点
-        runtimeService.createChangeActivityStateBuilder()
-                .processInstanceId(processInstanceId)
-                .moveActivityIdTo(currentTask.getTaskDefinitionKey(), submitTaskDefKey)
-                .changeState();
-
-        log.info("驳回重提成功: 任务 {} 已回退到提交节点 {}，意见: {}",
-                taskId, submitTaskDefKey, comment);
-
-        // 发送通知给提交人
-        if (submitter != null) {
-            List<User> users = userRepository.findByName(submitter).stream().toList();
-            if (!users.isEmpty()) {
-                User submitUser = users.get(0);
-                sendNotification(submitUser.getId(), submitter,
-                        "流程被驳回", "您的申请被驳回，请修改后重新提交。意见: " + comment,
-                        "REJECT", processInstanceId, taskId);
-            }
-        }
+        processCommonService.backToSubmitter(taskId, comment);
     }
 
     // ==================== 转办（Transfer） ====================

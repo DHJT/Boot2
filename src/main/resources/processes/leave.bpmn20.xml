@@ -7,28 +7,31 @@
         <flowable:formProperty id="applicantName" name="申请人姓名" type="string" required="true"/>
         <flowable:formProperty id="reason" name="请假原因" type="string" required="true"/>
         <flowable:formProperty id="days" name="请假天数" type="int" required="true"/>
-        <flowable:executionListener event="start" class="tech.dhjt.boot3.listener.ProcessStartListener"/>
+        <flowable:formProperty id="deptName" name="所属部门" type="string" required="true"/>
+        <!-- 流程启动由 GlobalProcessEventListener 统一处理 -->
       </extensionElements>
     </startEvent>
-    <!-- 提交申请（用户任务） -->
-    <userTask id="submitLeave" name="提交请假申请" flowable:assignee="${applicantName}" flowable:formKey="leaveForm">
+    <!-- 提交申请（用户任务） - 使用 skipExpression 当驳回时不自动跳过 -->
+    <userTask id="submitLeave" name="提交请假申请" flowable:assignee="${applicantName}" flowable:formKey="leaveForm"
+              flowable:skipExpression="${skipSubmitterWhenBackToSubmitter == true}">
       <extensionElements>
         <flowable:formProperty id="applicantName" name="申请人姓名" type="string"/>
         <flowable:formProperty id="reason" name="请假原因" type="string"/>
         <flowable:formProperty id="days" name="请假天数" type="int"/>
-        <flowable:taskListener event="create" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
-        <flowable:taskListener event="complete" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
+        <flowable:formProperty id="deptName" name="所属部门" type="string"/>
+        <!-- 任务事件由 GlobalProcessEventListener 统一处理 -->
       </extensionElements>
     </userTask>
-    <!-- 排他网关：根据请假天数判断是否需要院长审批 -->
-    <exclusiveGateway id="gatewayDays" name="天数判断"/>
-    <!-- 辅导员审批 -->
-    <userTask id="advisorApproval" name="辅导员审批" flowable:candidateGroups="advisor" flowable:formKey="advisorForm">
+    <!-- 服务任务：调用 DMN 决策委托进行综合评估（天数判断+部门判断） -->
+    <serviceTask id="dmnEvaluation" name="DMN决策评估" flowable:delegateExpression="${dmnEvaluationDelegate}"/>
+    <!-- 排他网关：根据 DMN 决策结果判断审批流向 -->
+    <exclusiveGateway id="gatewayDays" name="天数|部门判断"/>
+    <!-- 辅导员审批 - 由张三、李四两人审批（candidateUsers 配合 IDM 引擎实现） -->
+    <userTask id="advisorApproval" name="辅导员审批" flowable:candidateUsers="zhangsan,lisi" flowable:formKey="advisorForm">
       <extensionElements>
         <flowable:formProperty id="approved" name="是否同意" type="boolean" required="true"/>
         <flowable:formProperty id="comment" name="审批意见" type="string"/>
-        <flowable:taskListener event="create" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
-        <flowable:taskListener event="complete" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
+        <!-- 任务事件由 GlobalProcessEventListener 统一处理 -->
       </extensionElements>
     </userTask>
     <!-- 院长审批 -->
@@ -36,24 +39,26 @@
       <extensionElements>
         <flowable:formProperty id="approved" name="是否同意" type="boolean" required="true"/>
         <flowable:formProperty id="comment" name="审批意见" type="string"/>
-        <flowable:taskListener event="create" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
-        <flowable:taskListener event="complete" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
+        <!-- 任务事件由 GlobalProcessEventListener 统一处理 -->
       </extensionElements>
     </userTask>
-    <!-- 结束事件 -->
+    <!-- 结束事件（终止/结束均由全局监听器处理） -->
     <endEvent id="endEvent">
       <extensionElements>
-        <flowable:executionListener event="end" class="tech.dhjt.boot3.listener.ProcessEndListener"/>
+        <!-- 流程结束由 GlobalProcessEventListener 统一处理 -->
       </extensionElements>
     </endEvent>
     <!-- 连线 -->
     <sequenceFlow id="flowStartToSubmit" sourceRef="startEvent" targetRef="submitLeave"/>
-    <sequenceFlow id="flowSubmitToGateway" sourceRef="submitLeave" targetRef="gatewayDays"/>
+    <sequenceFlow id="flowSubmitToDmn" sourceRef="submitLeave" targetRef="dmnEvaluation"/>
+    <sequenceFlow id="flowDmnToGateway" sourceRef="dmnEvaluation" targetRef="gatewayDays"/>
+    <!-- DMN 决策结果为 short（短假）且部门不需要院长审批 -> 辅导员审批 -->
     <sequenceFlow id="flowGatewayToAdvisor" sourceRef="gatewayDays" targetRef="advisorApproval">
-      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${days <= 3}]]></conditionExpression>
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${finalNeedDeanApproval == false}]]></conditionExpression>
     </sequenceFlow>
+    <!-- DMN 决策结果为 long（长假）或部门规则要求院长审批 -> 院长审批 -->
     <sequenceFlow id="flowGatewayToDean" sourceRef="gatewayDays" targetRef="deanApproval">
-      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${days > 3}]]></conditionExpression>
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${finalNeedDeanApproval == true}]]></conditionExpression>
     </sequenceFlow>
     <sequenceFlow id="flowAdvisorToEnd" sourceRef="advisorApproval" targetRef="endEvent"/>
     <sequenceFlow id="flowDeanToEnd" sourceRef="deanApproval" targetRef="endEvent"/>
@@ -63,65 +68,74 @@
     <bpmndi:BPMNPlane bpmnElement="leaveProcess" id="BPMNPlane_leaveProcess">
       <!-- 开始事件 -->
       <bpmndi:BPMNShape id="shape_startEvent" bpmnElement="startEvent">
-        <omgdc:Bounds x="100.0" y="104.0" width="36" height="36"/>
+        <omgdc:Bounds x="60.0" y="140.0" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="98" y="140" width="40" height="14"/>
+          <omgdc:Bounds x="58" y="176" width="40" height="14"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <!-- 提交请假申请 -->
       <bpmndi:BPMNShape id="shape_submitLeave" bpmnElement="submitLeave">
-        <omgdc:Bounds x="200" y="82" width="100" height="80"/>
+        <omgdc:Bounds x="160" y="118" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <!-- DMN决策评估（服务任务） -->
+      <bpmndi:BPMNShape id="shape_dmnEvaluation" bpmnElement="dmnEvaluation">
+        <omgdc:Bounds x="310" y="118" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <!-- 排他网关（菱形） -->
       <bpmndi:BPMNShape id="shape_gatewayDays" bpmnElement="gatewayDays">
-        <omgdc:Bounds x="360" y="97" width="50" height="50"/>
+        <omgdc:Bounds x="470" y="133" width="50" height="50"/>
       </bpmndi:BPMNShape>
       <!-- 辅导员审批（上方） -->
       <bpmndi:BPMNShape id="shape_advisorApproval" bpmnElement="advisorApproval">
-        <omgdc:Bounds x="480" y="60" width="100" height="80"/>
+        <omgdc:Bounds x="590" y="75" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <!-- 院长审批（下方） -->
       <bpmndi:BPMNShape id="shape_deanApproval" bpmnElement="deanApproval">
-        <omgdc:Bounds x="480" y="140" width="100" height="80"/>
+        <omgdc:Bounds x="590" y="165" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <!-- 结束事件 -->
       <bpmndi:BPMNShape id="shape_endEvent" bpmnElement="endEvent">
-        <omgdc:Bounds x="650" y="100" width="36" height="36"/>
+        <omgdc:Bounds x="760" y="136" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="648" y="140" width="40" height="14"/>
+          <omgdc:Bounds x="758" y="176" width="40" height="14"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <!-- 连线：开始 -> 提交申请 -->
       <bpmndi:BPMNEdge id="edge_flowStartToSubmit" bpmnElement="flowStartToSubmit">
-        <omgdi:waypoint x="136.0" y="122.0"/>
-        <omgdi:waypoint x="200" y="122"/>
+        <omgdi:waypoint x="96.0" y="158.0"/>
+        <omgdi:waypoint x="160" y="158"/>
       </bpmndi:BPMNEdge>
-      <!-- 连线：提交申请 -> 网关 -->
-      <bpmndi:BPMNEdge id="edge_flowSubmitToGateway" bpmnElement="flowSubmitToGateway">
-        <omgdi:waypoint x="300" y="122"/>
-        <omgdi:waypoint x="360" y="122"/>
+      <!-- 连线：提交申请 -> DMN决策评估 -->
+      <bpmndi:BPMNEdge id="edge_flowSubmitToDmn" bpmnElement="flowSubmitToDmn">
+        <omgdi:waypoint x="260" y="158"/>
+        <omgdi:waypoint x="310" y="158"/>
       </bpmndi:BPMNEdge>
-      <!-- 连线：网关 -> 辅导员审批 （≤3天） -->
+      <!-- 连线：DMN决策评估 -> 网关 -->
+      <bpmndi:BPMNEdge id="edge_flowDmnToGateway" bpmnElement="flowDmnToGateway">
+        <omgdi:waypoint x="410" y="158"/>
+        <omgdi:waypoint x="470" y="158"/>
+      </bpmndi:BPMNEdge>
+      <!-- 连线：网关 -> 辅导员审批（finalNeedDeanApproval=false） -->
       <bpmndi:BPMNEdge id="edge_flowGatewayToAdvisor" bpmnElement="flowGatewayToAdvisor">
-        <omgdi:waypoint x="385" y="122"/>
-        <omgdi:waypoint x="430" y="100"/>
-        <omgdi:waypoint x="480" y="100"/>
+        <omgdi:waypoint x="495" y="158"/>
+        <omgdi:waypoint x="540" y="115"/>
+        <omgdi:waypoint x="590" y="115"/>
       </bpmndi:BPMNEdge>
-      <!-- 连线：网关 -> 院长审批 （>3天） -->
+      <!-- 连线：网关 -> 院长审批（finalNeedDeanApproval=true） -->
       <bpmndi:BPMNEdge id="edge_flowGatewayToDean" bpmnElement="flowGatewayToDean">
-        <omgdi:waypoint x="385" y="122"/>
-        <omgdi:waypoint x="430" y="150"/>
-        <omgdi:waypoint x="480" y="160"/>
+        <omgdi:waypoint x="495" y="158"/>
+        <omgdi:waypoint x="540" y="190"/>
+        <omgdi:waypoint x="590" y="205"/>
       </bpmndi:BPMNEdge>
       <!-- 连线：辅导员审批 -> 结束 -->
       <bpmndi:BPMNEdge id="edge_flowAdvisorToEnd" bpmnElement="flowAdvisorToEnd">
-        <omgdi:waypoint x="580" y="100"/>
-        <omgdi:waypoint x="650" y="118"/>
+        <omgdi:waypoint x="690" y="115"/>
+        <omgdi:waypoint x="760" y="154"/>
       </bpmndi:BPMNEdge>
       <!-- 连线：院长审批 -> 结束 -->
       <bpmndi:BPMNEdge id="edge_flowDeanToEnd" bpmnElement="flowDeanToEnd">
-        <omgdi:waypoint x="580" y="160"/>
-        <omgdi:waypoint x="650" y="118"/>
+        <omgdi:waypoint x="690" y="205"/>
+        <omgdi:waypoint x="760" y="154"/>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

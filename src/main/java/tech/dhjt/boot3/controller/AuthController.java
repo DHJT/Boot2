@@ -1,5 +1,7 @@
 package tech.dhjt.boot3.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import tech.dhjt.boot3.service.UserService;
@@ -11,14 +13,13 @@ import java.util.Map;
  */
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
+@Tag(name = "认证管理", description = "用户登录认证相关接口")
 public class AuthController {
 
     private final UserService userService;
 
-    /**
-     * 用户登录
-     */
+    @Operation(summary = "用户登录", description = "使用用户名和密码登录，返回JWT令牌")
     @PostMapping("/login")
     public Map<String, Object> login(@RequestBody Map<String, String> credentials) {
         String username = credentials.get("username");
@@ -26,10 +27,7 @@ public class AuthController {
         return userService.login(username, password);
     }
 
-    /**
-     * 获取当前用户信息（从JWT中解析，这里返回测试信息）
-     * 实际应用中可以通过 SecurityContextHolder 获取
-     */
+    @Operation(summary = "获取当前用户信息", description = "从JWT中解析当前登录用户信息（需在请求头添加 Authorization: Bearer <token>）")
     @GetMapping("/me")
     public Map<String, String> me() {
         return Map.of(

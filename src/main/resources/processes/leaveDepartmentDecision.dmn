@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20151101"
+             xmlns:flowable="http://flowable.org/dmn"
+             id="leaveDepartmentDecision"
+             name="请假部门决策"
+             namespace="http://flowable.org/dmn">
+    <decision id="leaveDepartmentDecision" name="请假部门判断决策">
+        <extensionElements>
+            <flowable:description>根据提交人的部门判断是否需要院长审批</flowable:description>
+        </extensionElements>
+        <informationRequirement id="inputDataDept">
+            <requiredInput href="#inputDept"/>
+        </informationRequirement>
+        <decisionTable id="decisionTableDept" hitPolicy="UNIQUE">
+            <input id="inputDept" label="部门名称" flowable:type="string">
+                <inputExpression id="inputExpressionDept" typeRef="feel:string">
+                    <text>deptName</text>
+                </inputExpression>
+            </input>
+            <output id="outputNeedDean" label="是否需要院长审批" name="needDeanApproval" typeRef="feel:boolean"/>
+            <rule id="ruleDept1">
+                <inputEntry id="entryDept1">
+                    <text><![CDATA["技术部"]]></text>
+                </inputEntry>
+                <outputEntry id="outputDept1">
+                    <text><![CDATA[false]]></text>
+                </outputEntry>
+            </rule>
+            <rule id="ruleDept2">
+                <inputEntry id="entryDept2">
+                    <text><![CDATA["财务部"]]></text>
+                </inputEntry>
+                <outputEntry id="outputDept2">
+                    <text><![CDATA[false]]></text>
+                </outputEntry>
+            </rule>
+            <rule id="ruleDept3">
+                <inputEntry id="entryDept3">
+                    <text><![CDATA["行政部"]]></text>
+                </inputEntry>
+                <outputEntry id="outputDept3">
+                    <text><![CDATA[true]]></text>
+                </outputEntry>
+            </rule>
+            <rule id="ruleDept4">
+                <inputEntry id="entryDept4">
+                    <text><![CDATA["人事部"]]></text>
+                </inputEntry>
+                <outputEntry id="outputDept4">
+                    <text><![CDATA[true]]></text>
+                </outputEntry>
+            </rule>
+            <rule id="ruleDeptDefault">
+                <inputEntry id="entryDeptDefault">
+                    <text><![CDATA[true]]></text>
+                </inputEntry>
+                <outputEntry id="outputDeptDefault">
+                    <text><![CDATA[false]]></text>
+                </outputEntry>
+            </rule>
+        </decisionTable>
+    </decision>
+    <!-- DMN 图形信息 -->
+    <dmndi:DMNDI>
+        <dmndi:DMNDiagram>
+            <dmndi:DMNShape dmnElementRef="leaveDepartmentDecision">
+                <dc:Bounds x="250" y="150" width="300" height="200"/>
+            </dmndi:DMNShape>
+        </dmndi:DMNDiagram>
+    </dmndi:DMNDI>
+</definitions>

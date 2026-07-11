@@ -27,7 +27,6 @@ spring:
     console:
       enabled: true
       path: /h2-console     # 访问路径
-
 #entitymanager.packagesToScan:
 # springdoc-openapi项目配置
 springdoc:
@@ -47,7 +46,10 @@ knife4j:
   # 开启生产环境屏蔽
   production: false
   setting:
-    language: zh_cn
+    language: zh_cn # Knife4j默认显示中文(zh-CN),如果想直接显示英文(en-US)
+    enable-footer: false
+    enable-footer-custom: true
+    footer-custom-content: 'Copyright © 2024 DHJT. All Rights Reserved.'
   
 #启用shutdown
 #禁用密码验证endpoints.shutdown.sensitive=false
@@ -74,6 +76,9 @@ management:
 
 # Flowable 工作流引擎配置
 flowable:
+  dmn:
+    resource-location: classpath:/processes/
+    deploy-resources: false
   # 自动部署流程定义（扫描 classpath:processes/）
   async-executor-activate: false
   database-schema-update: true

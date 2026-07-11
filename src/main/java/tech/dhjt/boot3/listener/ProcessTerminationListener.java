@@ -6,17 +6,13 @@ import org.flowable.engine.impl.persistence.entity.ExecutionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import tech.dhjt.boot3.config.SpringContextUtil;
-import tech.dhjt.boot3.model.po.User;
-import tech.dhjt.boot3.service.NotificationService;
-import tech.dhjt.boot3.service.UserService;
 
 /**
- * 流程终止通知监听器 — 当流程直接被终止（非正常结束，如 runtimeService.deleteProcessInstance()）
- * 时，通知提交人（申请人）流程已被终止及相关信息。
+ * 流程终止监听器 — 仅做日志记录，通知逻辑已由 GlobalProcessEventListener 统一处理
  *
  * 该监听器绑定在流程的 end 事件上，通过判断 deleteReason 来区分是正常结束还是被强制终止。
- * 通过 SpringContextUtil 获取 Bean（因为 Flowable Listener 非 Spring 管理）
+ * 通知提交人/申请人的逻辑已移至 GlobalProcessEventListener.handleProcessCancelled()
+ * 申请单数据还原逻辑也已移至 GlobalProcessEventListener.restoreOrderData()
  */
 @Component("processTerminationListener")
 public class ProcessTerminationListener implements ExecutionListener {
@@ -47,58 +43,11 @@ public class ProcessTerminationListener implements ExecutionListener {
         String applicant = applicantName != null ? applicantName : initiator;
 
         log.info("═══════════════════════════════════════════");
-        log.info("【流程终止】流程实例ID: {}", processInstanceId);
-        log.info("【流程终止】流程定义: {}", processDefinitionId);
-        log.info("【流程终止】申请人: {}", applicant);
-        log.info("【流程终止】终止原因: {}", deleteReason);
+        log.info("【流程终止】实例ID: {} | 定义: {} | 申请人: {} | 原因: {}",
+                processInstanceId, processDefinitionId, applicant, deleteReason);
+        log.info("【流程终止】申请内容: {} | 天数: {}",
+                reason != null ? reason : "无", days != null ? days : 0);
+        log.info("【流程终止】(通知与数据还原已由 GlobalProcessEventListener 处理)");
         log.info("═══════════════════════════════════════════");
-
-        try {
-            NotificationService notificationService = SpringContextUtil.getBean(NotificationService.class);
-            UserService userService = SpringContextUtil.getBean(UserService.class);
-
-            // 如果申请人或发起人为空，尝试通过历史查询 initiator/startUserId
-            if (applicant == null || applicant.isEmpty()) {
-                String startUserId = (String) execution.getVariable("startUserId");
-                if (startUserId != null && !startUserId.isEmpty()) {
-                    applicant = startUserId;
-                }
-            }
-
-            // 通知申请人/发起人
-            if (applicant != null && !applicant.isEmpty()) {
-                User submitter = userService.getUserByUsername(applicant);
-                if (submitter != null) {
-                    String title = "流程已终止";
-                    String content = String.format(
-                            "【流程终止通知】您的流程申请已被终止。\n" +
-                                    "流程实例ID: %s\n" +
-                                    "终止原因: %s\n" +
-                                    "申请内容: %s\n" +
-                                    "天数: %d天",
-                            processInstanceId,
-                            deleteReason,
-                            reason != null ? reason : "无",
-                            days != null ? days : 0
-                    );
-
-                    notificationService.createNotification(
-                            submitter.getId(), submitter.getName(),
-                            title, content,
-                            "PROCESS_END",
-                            processInstanceId, null
-                    );
-
-                    log.info("【流程终止】已通知提交人: {} (ID: {})", submitter.getName(), submitter.getId());
-                } else {
-                    log.warn("【流程终止】未找到提交人用户: {}", applicant);
-                }
-            } else {
-                log.warn("【流程终止】无法确定提交人，跳过通知");
-            }
-
-        } catch (Exception e) {
-            log.error("【流程终止】发送通知失败: {}", e.getMessage(), e);
-        }
     }
 }

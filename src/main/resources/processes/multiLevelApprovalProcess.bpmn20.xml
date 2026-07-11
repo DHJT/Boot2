@@ -13,21 +13,20 @@
         <!-- 开始事件 -->
         <startEvent id="startEvent1" name="开始">
             <extensionElements>
-                <flowable:executionListener event="start" class="tech.dhjt.boot3.listener.ProcessStartListener"/>
+                <!-- 流程启动由 GlobalProcessEventListener 统一处理 -->
             </extensionElements>
         </startEvent>
-        <!-- 员工填写请假申请 -->
-        <userTask id="submitLeave" name="提交请假申请" flowable:assignee="${initiator}">
+        <!-- 员工填写请假申请 - 使用 skipExpression 当驳回时不自动跳过 -->
+        <userTask id="submitLeave" name="提交请假申请" flowable:assignee="${initiator}"
+                  flowable:skipExpression="${skipSubmitterWhenBackToSubmitter == true}">
             <extensionElements>
-                <flowable:taskListener event="create" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
-                <flowable:taskListener event="complete" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
+                <!-- 任务事件由 GlobalProcessEventListener 统一处理 -->
             </extensionElements>
         </userTask>
         <!-- 部门经理审批 -->
         <userTask id="managerApprove" name="部门经理审批" flowable:candidateGroups="management">
             <extensionElements>
-                <flowable:taskListener event="create" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
-                <flowable:taskListener event="complete" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
+                <!-- 任务事件由 GlobalProcessEventListener 统一处理 -->
             </extensionElements>
         </userTask>
         <!-- 审批结果判断（排他网关） -->
@@ -37,21 +36,19 @@
         <!-- 总监审批（仅大于3天时执行） -->
         <userTask id="directorApprove" name="总监审批" flowable:candidateGroups="directors">
             <extensionElements>
-                <flowable:taskListener event="create" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
-                <flowable:taskListener event="complete" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
+                <!-- 任务事件由 GlobalProcessEventListener 统一处理 -->
             </extensionElements>
         </userTask>
         <!-- 人力资源归档 -->
         <userTask id="archiveTask" name="人力资源归档" flowable:candidateGroups="hr">
             <extensionElements>
-                <flowable:taskListener event="create" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
-                <flowable:taskListener event="complete" class="tech.dhjt.boot3.listener.LeaveTaskListener"/>
+                <!-- 任务事件由 GlobalProcessEventListener 统一处理 -->
             </extensionElements>
         </userTask>
-        <!-- 结束事件 -->
+        <!-- 结束事件（终止/结束均由全局监听器处理） -->
         <endEvent id="endEvent1" name="结束">
             <extensionElements>
-                <flowable:executionListener event="end" class="tech.dhjt.boot3.listener.ProcessEndListener"/>
+                <!-- 流程结束由 GlobalProcessEventListener 统一处理 -->
             </extensionElements>
         </endEvent>
 

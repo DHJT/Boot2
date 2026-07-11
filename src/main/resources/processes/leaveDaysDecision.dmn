@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:biodi="http://bpmn.io/schema/dmn/biodi/2.0" id="null_leaveDaysDecision" name="请假天数决策" namespace="http://camunda.org/schema/1.0/dmn" exporter="dmn-js (https://demo.bpmn.io/dmn)" exporterVersion="11.0.2">
+    <description>此DMN模型定义了一个请假天数的决策逻辑。</description>
+
+    <decision id="leaveDaysDecision" name="请假天数判断决策">
+        <description>此决策用请假天数判断决策。</description>
+        <informationRequirement id="inputDataDays">
+            <requiredInput href="#inputDays"/>
+        </informationRequirement>
+        <decisionTable id="decisionTable" hitPolicy="UNIQUE">
+            <input id="inputDays" label="请假天数" biodi:width="150">
+                <inputExpression id="inputExpressionDays" typeRef="integer">
+                    <text>days</text>
+                </inputExpression>
+            </input>
+            <output id="outputCategory" label="请假类别" name="leaveCategory" typeRef="string"/>
+            <output id="output_tmp_1" label="请假类别_1" name="output_1" typeRef="string"/>
+            <rule id="ruleShort">
+                <description>天数日常</description>
+                <inputEntry id="entryShort">
+                    <text><![CDATA[<= 3]]></text>
+                </inputEntry>
+                <outputEntry id="outputShort">
+                    <text><![CDATA["short"]]></text>
+                </outputEntry>
+                <outputEntry id="outputShortTmp1">
+                    <text><![CDATA["正常"]]></text>
+                </outputEntry>
+            </rule>
+            <rule id="ruleLong">
+                <description>天数过多</description>
+                <inputEntry id="entryLong">
+                    <text><![CDATA[> 3]]></text>
+                </inputEntry>
+                <outputEntry id="outputLong">
+                    <text><![CDATA["long"]]></text>
+                </outputEntry>
+                <outputEntry id="outputLongTmp1">
+                    <text><![CDATA["异常"]]></text>
+                </outputEntry>
+            </rule>
+        </decisionTable>
+    </decision>
+</definitions>

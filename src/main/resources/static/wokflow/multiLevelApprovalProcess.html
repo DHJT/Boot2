@@ -223,32 +223,35 @@
                                  :class="['timeline-item', node.status]">
                                 <div class="dot"></div>
                                 <div class="content">
-                                    <div class="time">{{ formatTime(node.time) }}</div>
+                                    <div class="time">{{ formatTime(node.startTime) }}</div>
                                     <div class="node-title">
                                         {{ node.taskName }}
                                         <el-tag v-if="node.status === 'pending'" type="warning" size="small" effect="light" style="margin-left:6px;">待审批</el-tag>
                                         <el-tag v-else type="success" size="small" effect="light" style="margin-left:6px;">已完成</el-tag>
                                     </div>
-                                    <div class="node-detail">
-                                        <span v-if="node.assignee">处理人：{{ node.assignee }}</span>
-                                        <span v-else-if="node.status === 'pending'">处理人：待领取</span>
-                                        <span v-if="node.candidateGroups && node.candidateGroups.length > 0" style="margin-left:8px;">
-                                            (候选组：{{ node.candidateGroups.join(', ') }})
-                                        </span>
-                                    </div>
-                                    <div class="node-detail" v-if="node.status === 'completed'">
-                                        <span>审批结果：
-                                            <el-tag v-if="node.approval === 'approved'" type="success" size="small">同意</el-tag>
-                                            <el-tag v-else-if="node.approval === 'rejected'" type="danger" size="small">拒绝</el-tag>
-                                            <span v-else style="color:#909399;">-</span>
-                                        </span>
-                                        <span v-if="node.comment" style="margin-left:12px;">意见：{{ node.comment }}</span>
-                                    </div>
-                                    <!-- 待审批节点的操作按钮 -->
-                                    <div class="actions" v-if="node.status === 'pending' && node.taskId">
-                                        <el-button size="small" type="success" @click="quickApprove(node, 'approved', proc)">✅ 同意</el-button>
-                                        <el-button size="small" type="danger" @click="quickApprove(node, 'rejected', proc)">❌ 拒绝</el-button>
-                                    </div>
+                                    <!-- 遍历节点下所有用户记录（每个审批人一条） -->
+                                    <template v-for="(u, uIdx) in node.users" :key="uIdx">
+                                        <div class="node-detail">
+                                            <span v-if="u.assignee">处理人：{{ u.assignee }}</span>
+                                            <span v-else-if="u.status === 'pending' || u.status === 'claimed'">处理人：待领取</span>
+                                            <span v-if="u.candidateGroups && u.candidateGroups.length > 0" style="margin-left:8px;">
+                                                (候选组：{{ u.candidateGroups.join(', ') }})
+                                            </span>
+                                        </div>
+                                        <div class="node-detail" v-if="u.status === 'completed'">
+                                            <span>审批结果：
+                                                <el-tag v-if="u.approval === 'approved'" type="success" size="small">同意</el-tag>
+                                                <el-tag v-else-if="u.approval === 'rejected'" type="danger" size="small">拒绝</el-tag>
+                                                <span v-else style="color:#909399;">-</span>
+                                            </span>
+                                            <span v-if="u.comment" style="margin-left:12px;">意见：{{ u.comment }}</span>
+                                        </div>
+                                        <!-- 待审批/已认领节点的操作按钮 -->
+                                        <div class="actions" v-if="(u.status === 'pending' || u.status === 'claimed') && u.taskId">
+                                            <el-button size="small" type="success" @click="quickApprove(node, u, 'approved', proc)">✅ 同意</el-button>
+                                            <el-button size="small" type="danger" @click="quickApprove(node, u, 'rejected', proc)">❌ 拒绝</el-button>
+                                        </div>
+                                    </template>
                                 </div>
                             </div>
                         </div>
@@ -314,6 +317,7 @@ const app = createApp({
         const approvalDialog = reactive({
             visible: false,
             node: null,
+            user: null,
             process: null,
             approval: 'approved',
             comment: '',
@@ -338,7 +342,7 @@ const app = createApp({
             try {
                 const [defRes, allRes] = await Promise.all([
                     axios.get('/flowable/definitions'),
-                    axios.get('/flowable/multi/all')
+                    axios.get('/flowable/multi/all?t=' + Date.now())
                 ]);
                 stats.definitions = defRes.data.length;
                 const all = allRes.data;
@@ -378,8 +382,9 @@ const app = createApp({
             starting.value = true;
             startResult.value = '';
             try {
-                const res = await axios.post('/flowable/multi/start', null, {
+                const res = await axios.post('/flowable/start', null, {
                     params: {
+                        processKey: 'multiLevelApprovalProcess',
                         applicantName: startForm.applicantName,
                         reason: startForm.reason,
                         days: startForm.days
@@ -395,8 +400,9 @@ const app = createApp({
         };
 
         // 快速审批（打开对话框）
-        const quickApprove = (node, approval, proc) => {
+        const quickApprove = (node, user, approval, proc) => {
             approvalDialog.node = node;
+            approvalDialog.user = user;
             approvalDialog.process = proc;
             approvalDialog.approval = approval;
             approvalDialog.comment = '';
@@ -408,10 +414,10 @@ const app = createApp({
         const submitApproval = async () => {
             approvalDialog.loading = true;
             try {
-                await axios.post('/flowable/multi/complete', null, {
+                await axios.post('/flowable/task/approve', null, {
                     params: {
-                        taskId: approvalDialog.node.taskId,
-                        approval: approvalDialog.approval,
+                        taskId: approvalDialog.user.taskId,
+                        approved: approvalDialog.approval,
                         comment: approvalDialog.comment
                     }
                 });
@@ -426,12 +432,12 @@ const app = createApp({
         // 查看流程图
         const showDiagram = (processInstanceId) => {
             highlightInstance.value = processInstanceId;
-            diagramUrl.value = `/flowable/multi/diagram?processInstanceId=${processInstanceId}&t=${Date.now()}`;
+            diagramUrl.value = `/flowable/diagram?processInstanceId=${processInstanceId}&processKey=multiLevelApprovalProcess&t=${Date.now()}`;
         };
 
         // 流程图加载失败
         const onDiagramError = () => {
-            diagramUrl.value = '/flowable/multi/diagram';
+            diagramUrl.value = '/flowable/diagram';
             highlightInstance.value = '';
         };
 

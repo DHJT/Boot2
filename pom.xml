@@ -15,13 +15,13 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.3.1</version>
-        <relativePath /> <!-- lookup parent from repository -->
+        <relativePath />
     </parent>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <java.version>22</java.version>
+        <java.version>21</java.version>
         <mariadb.version>2.3.0</mariadb.version>
         <mysql.version>8.0.20</mysql.version>
         <druid.version>1.1.11</druid.version>
@@ -79,11 +79,11 @@
             <version>${flowable.version}</version>
         </dependency>
 <!--        自动计算并为流程模型生成缺失的 DI 信息-->
-        <dependency>
-            <groupId>org.flowable</groupId>
-            <artifactId>flowable-bpmn-layout</artifactId>
-            <version>${flowable.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.flowable</groupId>-->
+<!--            <artifactId>flowable-bpmn-layout</artifactId>-->
+<!--            <version>${flowable.version}</version>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-websocket</artifactId>

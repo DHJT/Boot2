@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:biodi="http://bpmn.io/schema/dmn/biodi/2.0" id="null_definition_id" name="" namespace="http://camunda.org/schema/1.0/dmn" exporter="dmn-js (https://demo.bpmn.io/dmn)" exporterVersion="11.0.2">
+  <description>此DMN模型定——示例。</description>
+  <decision id="decision" name="决策一">
+    <description>此DMN模型定——decision一。</description>
+    <decisionTable id="DecisionTable_usertasksdmntest001" hitPolicy="FIRST">
+      <input id="InputClause_0f96f2c" label="设备名称" biodi:width="150">
+        <inputExpression id="LiteralExpression_13ilo0n" typeRef="string">
+          <text>name</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_1oz6uhd" label="测试">
+        <inputExpression id="LiteralExpression_1nv81wp" typeRef="date">
+          <text>${test}</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_0lvgt95" label="监测端口" biodi:width="150">
+        <inputExpression id="LiteralExpression_023kxi4" typeRef="string">
+          <text></text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_0j6a3pv" label="流量类型" biodi:width="150">
+        <inputExpression id="LiteralExpression_1sx7h8m" typeRef="string">
+          <text>after(range1, range2)</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_1p27v90">
+        <inputExpression id="LiteralExpression_0cfy3uh" typeRef="string">
+          <text>流量大小</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_1km4g6u">
+        <inputExpression id="LiteralExpression_0d83i1t" typeRef="boolean">
+          <text></text>
+        </inputExpression>
+      </input>
+      <output id="OutputClause_1ua72fu" label="流量大小值" name="users" typeRef="string" biodi:width="150" />
+      <output id="OutputClause_10w1cu8" name="持续次数" typeRef="string" biodi:width="150" />
+      <output id="OutputClause_1cx3zc9" typeRef="string" />
+      <output id="OutputClause_0pij4d7" typeRef="string" />
+      <output id="OutputClause_0vpqj0q" typeRef="string" biodi:width="150" />
+      <rule id="DecisionRule_0g5reha">
+        <description>13214423</description>
+        <inputEntry id="UnaryTests_0mmgj38">
+          <text>设备名称1</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1i7to1h">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1mjzg79">
+          <text>监测端口1</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_14dke11">
+          <text>流入</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1g059g4">
+          <text>&gt;= 1000</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_018o6xs">
+          <text></text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_1sg47bk">
+          <text>80000</text>
+        </outputEntry>
+        <outputEntry id="LiteralExpression_14gvku2">
+          <text>1</text>
+        </outputEntry>
+        <outputEntry id="LiteralExpression_083ynbb">
+          <text></text>
+        </outputEntry>
+        <outputEntry id="LiteralExpression_04wh2pl">
+          <text></text>
+        </outputEntry>
+        <outputEntry id="LiteralExpression_0fbx2zq">
+          <text></text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

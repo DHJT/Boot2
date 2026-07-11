@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import java.util.concurrent.*;
 
 @RestController
 @RequestMapping("/")
+@Tag(name = "首页测试", description = "系统首页及测试接口")
 public class HomeController {
 
     private static final Logger logger = LoggerFactory.getLogger(HomeController.class);
@@ -23,16 +25,19 @@ public class HomeController {
     @Autowired
     private HomeService homeService;
 
+    @Operation(summary = "首页", description = "返回系统首页欢迎信息")
     @GetMapping("/home")
     public String getResponse() {
         return homeService.getResponse();
     }
 
+    @Operation(summary = "异步测试1")
     @GetMapping("/home1")
     public Future<String> getResponse1() {
         return homeService.getResponse1();
     }
 
+    @Operation(summary = "异步测试2", description = "带有超时控制与异常处理的异步调用示例")
     @GetMapping("/home2")
     public Future<String> getResponse2() {
         long start = System.currentTimeMillis();
@@ -68,8 +73,11 @@ public class HomeController {
             @Parameter(name = "name",description = "文件名称",required = true,in=ParameterIn.QUERY)
     })
     @PostMapping("/bodyParamHeaderPath/{id}")
-    public ResponseEntity<User> bodyParamHeaderPath(@PathVariable String id, @RequestHeader("token") String token,
-                                                    @RequestParam("name")String name, @RequestBody User fileResp) {
+    public ResponseEntity<User> bodyParamHeaderPath(
+            @Parameter(description = "路径参数ID") @PathVariable String id,
+            @Parameter(description = "请求令牌") @RequestHeader("token") String token,
+            @Parameter(description = "文件名称") @RequestParam("name") String name,
+            @RequestBody User fileResp) {
         fileResp.setName(fileResp.getName() + ",receiveName:" + name + ",token:" + token + ",pathID:" + id);
         return ResponseEntity.ok(fileResp);
     }

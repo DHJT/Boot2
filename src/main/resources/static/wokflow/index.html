@@ -357,7 +357,7 @@
         }
 
         function deployProcess() {
-            api('/flowable/deploy', { method: 'POST' }).then(r => { showToast('请假流程已部署'); loadProcesses(); }).catch(e => showToast(e.message, 'error'));
+            api('/flowable/deploy?processKey=leaveProcess', { method: 'POST' }).then(r => { showToast('请假流程已部署'); loadProcesses(); }).catch(e => showToast(e.message, 'error'));
         }
 
         function showStartProcess() {
@@ -372,7 +372,7 @@
             const applicant = $('startApplicant').value;
             const reason = $('startReason').value;
             const days = parseInt($('startDays').value) || 1;
-            api('/flowable/start?applicantName='+encodeURIComponent(applicant)+'&reason='+encodeURIComponent(reason)+'&days='+days, { method: 'POST' })
+            api('/flowable/start?processKey=leaveProcess&applicantName='+encodeURIComponent(applicant)+'&reason='+encodeURIComponent(reason)+'&days='+days, { method: 'POST' })
                 .then(r => { showToast('流程已发起，实例ID: ' + r); closeModal(); loadProcesses(); })
                 .catch(e => showToast(e.message, 'error'));
         }
@@ -381,17 +381,19 @@
         function showProcessDetail(processInstanceId) {
             api('/flowable/detail/' + processInstanceId).then(data => {
                 const timeline = (data.timeline || []).map(t => {
-                    const approved = t.approved === true || t.approval === 'approved';
-                    const rejected = t.approved === false || t.approval === 'rejected';
+                    // 取第一个用户记录（兼容多实例）
+                    const u = (t.users && t.users.length > 0) ? t.users[0] : {};
+                    const approved = u.approved === true || u.approval === 'approved';
+                    const rejected = u.approved === false || u.approval === 'rejected';
                     const dotClass = t.status === 'pending' ? 'pending' : (rejected ? 'rejected' : 'completed');
                     const dotIcon = t.status === 'pending' ? '⏳' : (rejected ? '✕' : '✓');
                     return `<div class="timeline-item">
                         <div class="timeline-dot ${dotClass}">${dotIcon}</div>
                         <div class="timeline-content">
                             <div class="tl-title">${t.taskName||'-'} ${t.status === 'pending' ? '<span class="badge badge-warning">待审批</span>' : (rejected ? '<span class="badge badge-danger">拒绝</span>' : '<span class="badge badge-success">通过</span>')}</div>
-                            <div class="tl-info">处理人: ${t.assignee||'-'} | ${formatTime(t.time)}</div>
-                            ${t.comment ? '<div class="tl-comment">💬 ' + t.comment + '</div>' : ''}
-                            ${t.candidateGroups ? '<div class="tl-info">候选组: ' + t.candidateGroups.join(', ') + '</div>' : ''}
+                            <div class="tl-info">处理人: ${u.assignee||'-'} | ${formatTime(t.startTime)}</div>
+                            ${u.comment ? '<div class="tl-comment">💬 ' + u.comment + '</div>' : ''}
+                            ${u.candidateGroups && u.candidateGroups.length > 0 ? '<div class="tl-info">候选组: ' + u.candidateGroups.join(', ') + '</div>' : ''}
                         </div>
                     </div>`;
                 }).join('');
@@ -445,7 +447,7 @@
 
         function doApprove(taskId, approval) {
             const comment = $('approveComment').value || (approval === 'approved' ? '同意' : '驳回');
-            api('/flowable/multi/complete?taskId='+taskId+'&approval='+approval+'&comment='+encodeURIComponent(comment), { method: 'POST' })
+            api('/flowable/task/approve?taskId='+taskId+'&approved='+ (approval==='approved') +'&comment='+encodeURIComponent(comment), { method: 'POST' })
                 .then(r => { showToast('审批完成: ' + (approval==='approved'?'已通过':'已驳回')); closeModal(); renderTasks(); })
                 .catch(e => showToast(e.message, 'error'));
         }
@@ -739,18 +741,21 @@
         function renderLeaveTimeline(timeline) {
             if (!timeline || !timeline.length) return '<div style="color:#909399;text-align:center;padding:16px;">暂无审批记录</div>';
             return `<div class="timeline">${timeline.map(t => {
-                const approved = t.approved === true || t.approval === 'approved';
-                const rejected = t.approved === false || t.approval === 'rejected';
+                // 取第一个用户记录（兼容多实例）
+                const u = (t.users && t.users.length > 0) ? t.users[0] : {};
+                const approved = u.approved === true || u.approval === 'approved';
+                const rejected = u.approved === false || u.approval === 'rejected';
                 const dotClass = t.status === 'pending' ? 'pending' : (rejected ? 'rejected' : 'completed');
                 const dotIcon = t.status === 'pending' ? '⏳' : (rejected ? '✕' : '✓');
+                const hasAction = (u.status === 'pending' || u.status === 'claimed') && u.taskId;
                 return `<div class="timeline-item">
                     <div class="timeline-dot ${dotClass}">${dotIcon}</div>
                     <div class="timeline-content">
                         <div class="tl-title">${t.taskName||'-'} ${t.status === 'pending' ? '<span class="badge badge-warning">待审批</span>' : (rejected ? '<span class="badge badge-danger">拒绝</span>' : '<span class="badge badge-success">通过</span>')}</div>
-                        <div class="tl-info">处理人: ${t.assignee||'-'} | ${formatTime(t.time)}</div>
-                        ${t.comment ? '<div class="tl-comment">💬 ' + t.comment + '</div>' : ''}
-                        ${t.candidateGroups ? '<div class="tl-info">候选组: ' + t.candidateGroups.join(', ') + '</div>' : ''}
-                        ${t.status === 'pending' && t.taskId ? '<div class="approval-btns"><button class="btn btn-success btn-sm" onclick="quickApproveLeave(\''+t.taskId+'\',true,\''+t.processInstanceId+'\')">✅ 同意</button><button class="btn btn-danger btn-sm" onclick="quickApproveLeave(\''+t.taskId+'\',false,\''+t.processInstanceId+'\')">❌ 拒绝</button></div>' : ''}
+                        <div class="tl-info">处理人: ${u.assignee||'-'} | ${formatTime(t.startTime)}</div>
+                        ${u.comment ? '<div class="tl-comment">💬 ' + u.comment + '</div>' : ''}
+                        ${u.candidateGroups && u.candidateGroups.length > 0 ? '<div class="tl-info">候选组: ' + u.candidateGroups.join(', ') + '</div>' : ''}
+                        ${hasAction ? '<div class="approval-btns"><button class="btn btn-success btn-sm" onclick="quickApproveLeave(\''+u.taskId+'\',true)">✅ 同意</button><button class="btn btn-danger btn-sm" onclick="quickApproveLeave(\''+u.taskId+'\',false)">❌ 拒绝</button></div>' : ''}
                     </div>
                 </div>`;
             }).join('')}</div>`;
@@ -761,7 +766,7 @@
             const reason = $('leaveReason').value;
             const days = parseInt($('leaveDays').value) || 1;
             if (!reason) { showToast('请输入请假原因', 'error'); return; }
-            api('/flowable/start?applicantName='+encodeURIComponent(applicant)+'&reason='+encodeURIComponent(reason)+'&days='+days, { method: 'POST' })
+            api('/flowable/start?processKey=leaveProcess&applicantName='+encodeURIComponent(applicant)+'&reason='+encodeURIComponent(reason)+'&days='+days, { method: 'POST' })
                 .then(r => { showToast('流程已发起，实例ID: ' + r); renderLeave(); })
                 .catch(e => showToast(e.message, 'error'));
         }
@@ -770,7 +775,7 @@
             showProcessDiagram(processInstanceId);
         }
 
-        function quickApproveLeave(taskId, approved, processInstanceId) {
+        function quickApproveLeave(taskId, approved) {
             const approval = approved ? 'approved' : 'rejected';
             const comment = approved ? '同意' : '驳回';
             openModal(`<h2>✏️ 审批确认</h2>
@@ -783,7 +788,7 @@
 
         function doQuickApproveLeave(taskId, approval) {
             const comment = $('quickCommentLeave').value || (approval==='approved'?'同意':'驳回');
-            api('/flowable/complete?taskId='+taskId+'&approved='+(approval==='approved')+'&comment='+encodeURIComponent(comment), { method: 'POST' })
+            api('/flowable/task/approve?taskId='+taskId+'&approved='+(approval==='approved')+'&comment='+encodeURIComponent(comment), { method: 'POST' })
                 .then(r => { showToast('审批完成'); closeModal(); renderLeave(); })
                 .catch(e => showToast(e.message, 'error'));
         }
@@ -870,18 +875,21 @@
         function renderMultiTimeline(timeline) {
             if (!timeline || !timeline.length) return '<div style="color:#909399;text-align:center;padding:16px;">暂无审批记录</div>';
             return `<div class="timeline">${timeline.map(t => {
-                const rejected = t.approval === 'rejected';
-                const approved = t.approval === 'approved';
+                // 取第一个用户记录（兼容多实例）
+                const u = (t.users && t.users.length > 0) ? t.users[0] : {};
+                const rejected = u.approval === 'rejected';
+                const approved = u.approval === 'approved';
                 const dotClass = t.status === 'pending' ? 'pending' : (rejected ? 'rejected' : 'completed');
                 const dotIcon = t.status === 'pending' ? '⏳' : (rejected ? '✕' : '✓');
+                const hasAction = (u.status === 'pending' || u.status === 'claimed') && u.taskId;
                 return `<div class="timeline-item">
                     <div class="timeline-dot ${dotClass}">${dotIcon}</div>
                     <div class="timeline-content">
                         <div class="tl-title">${t.taskName||'-'} ${t.status === 'pending' ? '<span class="badge badge-warning">待审批</span>' : (rejected ? '<span class="badge badge-danger">拒绝</span>' : '<span class="badge badge-success">通过</span>')}</div>
-                        <div class="tl-info">处理人: ${t.assignee||'-'} | ${formatTime(t.time)}</div>
-                        ${t.comment ? '<div class="tl-comment">💬 ' + t.comment + '</div>' : ''}
-                        ${t.candidateGroups ? '<div class="tl-info">候选组: ' + t.candidateGroups.join(', ') + '</div>' : ''}
-                        ${t.status === 'pending' && t.taskId ? '<div class="approval-btns"><button class="btn btn-success btn-sm" onclick="quickApproveMulti(\''+t.taskId+'\',\'approved\')">✅ 同意</button><button class="btn btn-danger btn-sm" onclick="quickApproveMulti(\''+t.taskId+'\',\'rejected\')">❌ 拒绝</button></div>' : ''}
+                        <div class="tl-info">处理人: ${u.assignee||'-'} | ${formatTime(t.startTime)}</div>
+                        ${u.comment ? '<div class="tl-comment">💬 ' + u.comment + '</div>' : ''}
+                        ${u.candidateGroups && u.candidateGroups.length > 0 ? '<div class="tl-info">候选组: ' + u.candidateGroups.join(', ') + '</div>' : ''}
+                        ${hasAction ? '<div class="approval-btns"><button class="btn btn-success btn-sm" onclick="quickApproveMulti(\''+u.taskId+'\',\'approved\')">✅ 同意</button><button class="btn btn-danger btn-sm" onclick="quickApproveMulti(\''+u.taskId+'\',\'rejected\')">❌ 拒绝</button></div>' : ''}
                     </div>
                 </div>`;
             }).join('')}</div>`;
@@ -892,13 +900,13 @@
             const reason = $('multiReason').value;
             const days = parseInt($('multiDays').value) || 1;
             if (!reason) { showToast('请输入申请原因', 'error'); return; }
-            api('/flowable/multi/start?applicantName='+encodeURIComponent(applicant)+'&reason='+encodeURIComponent(reason)+'&days='+days, { method: 'POST' })
+            api('/flowable/start?processKey=multiLevelApprovalProcess&applicantName='+encodeURIComponent(applicant)+'&reason='+encodeURIComponent(reason)+'&days='+days, { method: 'POST' })
                 .then(r => { showToast('多级审批流程已发起，实例ID: ' + r); renderMultiLevel(); })
                 .catch(e => showToast(e.message, 'error'));
         }
 
         function showDiagramMulti(processInstanceId) {
-            openModal(`<h2>📊 流程图</h2><div style="text-align:center;"><img src="${API_BASE}/flowable/multi/diagram?processInstanceId=${processInstanceId}&t=${Date.now()}" style="max-width:100%;border-radius:8px;" onerror="this.parentElement.innerHTML='<div class=\\'empty-state\\'>无法加载流程图</div>'"></div>
+            openModal(`<h2>📊 流程图</h2><div style="text-align:center;"><img src="${API_BASE}/flowable/diagram?processInstanceId=${processInstanceId}&processKey=multiLevelApprovalProcess&t=${Date.now()}" style="max-width:100%;border-radius:8px;" onerror="this.parentElement.innerHTML='<div class=\\'empty-state\\'>无法加载流程图</div>'"></div>
                 <div class="form-actions"><button class="btn btn-primary" onclick="closeModal()">关闭</button></div>`);
         }
 
@@ -913,7 +921,7 @@
 
         function doQuickApproveMulti(taskId, approval) {
             const comment = $('multiComment').value || (approval==='approved'?'同意':'驳回');
-            api('/flowable/multi/complete?taskId='+taskId+'&approval='+approval+'&comment='+encodeURIComponent(comment), { method: 'POST' })
+            api('/flowable/task/approve?taskId='+taskId+'&approved='+(approval==='approved')+'&comment='+encodeURIComponent(comment), { method: 'POST' })
                 .then(r => { showToast('审批完成'); closeModal(); renderMultiLevel(); })
                 .catch(e => showToast(e.message, 'error'));
         }
