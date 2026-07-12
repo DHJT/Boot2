@@ -1,11 +1,53 @@
 server:
   port: 8080
-  tomcat.threads.virtual.enabled: true
 # 全局启用虚拟线程
 spring:
+  # 解决同时存在 web + webflux 依赖时 H2 Console 无法访问的问题
+  # 确保使用 Servlet（Tomcat）模式而非 Reactor（Netty）模式
+  main:
+    web-application-type: servlet
   threads:
     virtual:
       enabled: true
+  # H2 内存数据库配置
+  datasource:
+    url: jdbc:h2:mem:boot4db
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+  # H2 Console（开发环境可用）
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jackson:
+    time-zone: Asia/Shanghai
+# MyBatis-Plus 配置
+mybatis-plus:
+  # 指定 Mapper XML 文件位置（如果使用 XML）
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: tech.dhjt.boot.bean
+# 全局枚举扫描包
+#  type-enums-package: tech.dhjt.boot.enums
+#  type-handlers-package: com.example.handler
+  #  全局配置
+  global-config:
+    db-config:
+      # 主键类型，例如 AUTO 为数据库自增，ASSIGN_ID 为雪花算法
+      id-type: auto
+      logic-delete-field: deleted      # 逻辑删除字段名（实体中仍需 @TableLogic）
+      logic-delete-value: 1            # 删除后的值
+      logic-not-delete-value: 0        # 未删除的值
+  # 原生 MyBatis 配置
+  configuration:
+    # 控制台打印 SQL 日志
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 开启下划线到驼峰命名的自动映射: 字段下划线转驼峰
+    map-underscore-to-camel-case: true
 management:
   endpoint:
     health:
@@ -17,4 +59,13 @@ management:
     web:
       exposure:
         include: "*" # health,env,configprops,info,metrics
-  
+# knife4j的增强配置，不需要增强可以不配
+knife4j:
+  enable: true
+  # 开启生产环境屏蔽
+  production: false
+  setting:
+    language: zh_cn
+logging:
+  level:
+    tech.dhjt.boot.mapper: DEBUG   # 将包名替换为你自己的 mapper 包

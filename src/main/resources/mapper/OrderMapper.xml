@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.dhjt.boot.mapper.OrderMapper">
+
+    <!-- 自定义 resultMap：显式指定 JSON 字段的 TypeHandler 以支持 JacksonTypeHandler 自动映射 -->
+    <resultMap id="BaseResultMap" type="tech.dhjt.boot.bean.Order" autoMapping="true">
+
+        <id column="id" property="id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="customer_name" property="customerName"/>
+        <result column="amount" property="amount"/>
+        <result column="status" property="status"/>
+        <result column="order_time" property="orderTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="version" property="version"/>
+        <result column="deleted" property="deleted"/>
+        <result column="extra_info" property="extraInfo" typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result column="third_infos" property="thirdInfos" typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+    </resultMap>
+
+    <!-- 根据状态分页查询（子查询方式：先查分页ID，再查完整数据） -->
+    <select id="selectPageByStatusWithSubQuery1" resultMap="BaseResultMap">
+        SELECT * FROM t_order
+        WHERE id IN (
+            SELECT id FROM t_order
+            WHERE status = #{status} and deleted = 0
+            ORDER BY id
+            LIMIT #{size} OFFSET #{offset}
+        )
+        ORDER BY id
+    </select>
+
+    <select id="selectPageByStatusWithSubQuery" resultMap="BaseResultMap">
+        SELECT * FROM t_order
+        WHERE id IN (
+            SELECT id FROM t_order
+            WHERE status = #{status} and deleted = 0
+            ORDER BY id
+            <bind name="offset" value="(page.current - 1) * page.size"/>
+            LIMIT #{page.size} OFFSET #{offset}
+            )
+        ORDER BY id
+    </select>
+
+    <!-- 根据状态统计总数 -->
+    <select id="selectCountByStatus" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM t_order
+        WHERE status = #{status} and deleted = 0
+    </select>
+
+</mapper>

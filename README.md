@@ -34,3 +34,20 @@ http://localhost:8080/actuator/
 ```sh
 curl http://localhost:8080/test  -H "version: 1"
 ```
+
+http://localhost:8080/h2-console
+
+http://localhost:8080/doc.html
+http://localhost:8080/swagger-ui.html
+
+```shell
+mvn dependency:tree
+mvn dependency:sources
+# 下载特定依赖的源码
+mvn dependency:sources -DincludeGroupIds=com.baomidou -DincludeArtifactIds=mybatis-plus-core
+mvn clean package -DskipTests
+# 无需项目，直接通过坐标下载
+mvn dependency:get \
+  -Dartifact=com.baomidou:mybatis-plus-core:3.5.9:jar:sources \
+  -DremoteRepositories=https://repo1.maven.org/maven2/
+```
