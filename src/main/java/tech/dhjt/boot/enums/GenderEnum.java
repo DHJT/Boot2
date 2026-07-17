@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Getter;
 
 @Getter
-public enum GenderEnum implements IEnum<Integer> {
+public enum GenderEnum implements IEnum<Integer, String> {
     MALE(1, "男"),
     FEMALE(2, "女"),
     UNKNOWN(0, "未知");

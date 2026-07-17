@@ -1,7 +1,9 @@
 package tech.dhjt.boot.enums;
 
-public interface IEnum<T> {
+public interface IEnum<K, V> {
 
-    T getCode();
+    K getCode();
+
+    V getDesc();
 
 }

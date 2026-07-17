@@ -1,6 +1,9 @@
 package tech.dhjt.boot.enums;
 
-public enum BaseEnum implements IEnum<Integer> {
+import lombok.Getter;
+
+@Getter
+public enum BaseEnum implements IEnum<Integer, String> {
     UNKNOWN(0, "未知");
 
     private final Integer code;
@@ -12,8 +15,4 @@ public enum BaseEnum implements IEnum<Integer> {
         this.desc = desc;
     }
 
-    @Override
-    public Integer getCode() {
-        return code;
-    }
 }
