@@ -57,6 +57,21 @@ public class Order {
     // @TableField(typeHandler = JacksonTypeHandler.class)
     // private ExtraInfo extraInfo;
 
+    /** 下单人名称 */
+    private String orderPersonName;
+
+    /** 下单人联系方式 */
+    private String orderPersonPhone;
+
+    /** 下单人地址 */
+    private String orderPersonAddress;
+
+    /** 下单人银行 */
+    private String orderPersonBank;
+
+    /** 下单人开户行 */
+    private String orderPersonBankBranch;
+
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<OrderRelateThirdInfo> thirdInfos;
 

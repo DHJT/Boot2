@@ -3,8 +3,8 @@ package tech.dhjt.boot.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.groups.Default;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +18,8 @@ import tech.dhjt.boot.config.TenantContext;
 import tech.dhjt.boot.convert.OrderConvert;
 import tech.dhjt.boot.enums.OrderStatusEnum;
 import tech.dhjt.boot.service.OrderService;
+import tech.dhjt.boot.validation.groups.Create;
+import tech.dhjt.boot.validation.groups.Update;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -30,7 +32,6 @@ import java.util.Map;
 @Tag(name = "订单测试", description = "订单首页及测试接口")
 @Slf4j
 @RequiredArgsConstructor
-@Validated
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {
@@ -47,7 +48,7 @@ public class OrderController {
 
     @Operation(summary = "updateById", description = "updateById")
     @PutMapping("/updateById")
-    public ResponseEntity<Object> updateById(@Valid @RequestBody OrderDTO updateOrder) {
+    public ResponseEntity<Object> updateById(@Validated({Update.class, Default.class}) @RequestBody OrderDTO updateOrder) {
         Long id = updateOrder.getId();
         Order oldOrder = orderService.lambdaQuery().eq(Order::getId, id).one();
 
@@ -91,7 +92,7 @@ public class OrderController {
      */
     @Operation(summary = "createOrder", description = "createOrder")
     @PostMapping
-    public ResponseEntity<Order> createOrder(@RequestBody OrderDTO orderDTO) {
+    public ResponseEntity<Order> createOrder(@Validated(Create.class) @RequestBody OrderDTO orderDTO) {
         TenantContext.setCurrentTenant(0L);
 
         Order order = orderConvert.toBeanForAdd(orderDTO);
@@ -101,7 +102,7 @@ public class OrderController {
         extraInfo.put("time", LocalDateTime.now());
         order.setExtraInfo(extraInfo);
 
-        OrderRelateThirdInfo thirdInfo = OrderRelateThirdInfo.builder().info("测试：" + LocalDateTime.now().toString()).thirdNo("1").build();
+        OrderRelateThirdInfo thirdInfo = OrderRelateThirdInfo.builder().info("测试：" + LocalDateTime.now()).thirdNo("1").build();
 
         order.setThirdInfos(List.of(thirdInfo, thirdInfo));
         Order saved = orderService.save1(order);

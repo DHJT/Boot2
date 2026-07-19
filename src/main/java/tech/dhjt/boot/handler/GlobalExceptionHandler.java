@@ -22,12 +22,26 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     // ① 400 参数绑定 / 参数校验失败：表单对象、查询参数绑定不通过
+    // 同时处理属性级校验（FieldError）和类级别校验（ObjectError，如 @ConditionalRequired）
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     @ExceptionHandler(BindException.class)
     public Result<Void> handleValid(BindException e) {
-        // getFieldError() 在对象级校验时可能为 null，做个兜底
+        String msg = null;
+        // 优先取属性级错误
         FieldError fieldError = e.getBindingResult().getFieldError();
-        String msg = fieldError != null ? fieldError.getDefaultMessage() : "参数校验失败";
+        if (fieldError != null) {
+            msg = fieldError.getDefaultMessage();
+        }
+        // 若无属性级错误，则取类级别错误（如 @ConditionalRequired 条件校验失败）
+        if (msg == null) {
+            var globalError = e.getBindingResult().getGlobalError();
+            if (globalError != null) {
+                msg = globalError.getDefaultMessage();
+            }
+        }
+        if (msg == null) {
+            msg = "参数校验失败";
+        }
         log.warn("参数校验失败：{}", msg);
         return Result.fail(400, msg);
     }
