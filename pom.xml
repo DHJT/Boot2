@@ -20,6 +20,7 @@
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <knife4j.version>4.5.0</knife4j.version>
         <mapstruct.version>1.6.3</mapstruct.version>
+        <protovalidate.version>1.2.2</protovalidate.version>
     </properties>
      
     <dependencies>
@@ -83,6 +84,14 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-grpc-client</artifactId>
+        </dependency>
+
+
+        <dependency>
+            <groupId>build.buf</groupId>
+            <artifactId>protovalidate</artifactId>
+            <version>${protovalidate.version}</version>
+            <scope>compile</scope>
         </dependency>
 
         <dependency>

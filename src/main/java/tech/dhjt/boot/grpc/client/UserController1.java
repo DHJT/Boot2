@@ -53,8 +53,8 @@ public class UserController1 {
     }
 
     @PostMapping("/listUsers")
-    public List<UserInfo> listUsers(@PathVariable long userId) {
-        ListUsersRequest request = ListUsersRequest.newBuilder().setPageSize(3).build();
+    public List<UserInfo> listUsers(@PathVariable int pageSize) {
+        ListUsersRequest request = ListUsersRequest.newBuilder().setPageSize(pageSize).build();
         Iterator<UserInfo> iterator = blockingStub.listUsers(request);
 
         List<UserInfo> users = new ArrayList<> ();
