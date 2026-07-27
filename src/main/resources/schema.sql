@@ -14,3 +14,11 @@ CREATE TABLE IF NOT EXISTS t_order (
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 状态机持久化上下文表
+CREATE TABLE IF NOT EXISTS state_machine_context (
+    machine_id VARCHAR(128) PRIMARY KEY,   -- 业务标识（如订单号）
+    state VARCHAR(64) NOT NULL,            -- 当前状态
+    extended_state TEXT,                   -- 扩展状态变量（JSON）
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
