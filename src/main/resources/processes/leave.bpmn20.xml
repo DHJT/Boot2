@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:flowable="http://flowable.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" typeLanguage="http://www.w3.org/2001/XMLSchema" expressionLanguage="http://www.w3.org/1999/XPath" targetNamespace="http://flowable.org/bpmn">
-  <process id="leaveProcess" name="请假审批流程" isExecutable="true">
+  <process id="leaveProcess" name="请假审批流程（含驳回重提）" isExecutable="true">
     <!-- 开始事件 -->
     <startEvent id="startEvent" flowable:formKey="leaveForm">
       <extensionElements>
@@ -42,6 +42,8 @@
         <!-- 任务事件由 GlobalProcessEventListener 统一处理 -->
       </extensionElements>
     </userTask>
+    <!-- 审批结果网关：同意→结束；拒绝→退回提交人重新提交（完整审批闭环） -->
+    <exclusiveGateway id="gatewayApprovalResult" name="审批结果判断" default="flowResultToEndDefault"/>
     <!-- 结束事件（终止/结束均由全局监听器处理） -->
     <endEvent id="endEvent">
       <extensionElements>
@@ -60,8 +62,19 @@
     <sequenceFlow id="flowGatewayToDean" sourceRef="gatewayDays" targetRef="deanApproval">
       <conditionExpression xsi:type="tFormalExpression"><![CDATA[${finalNeedDeanApproval == true}]]></conditionExpression>
     </sequenceFlow>
-    <sequenceFlow id="flowAdvisorToEnd" sourceRef="advisorApproval" targetRef="endEvent"/>
-    <sequenceFlow id="flowDeanToEnd" sourceRef="deanApproval" targetRef="endEvent"/>
+    <!-- 辅导员/院长审批完成后统一汇入审批结果网关 -->
+    <sequenceFlow id="flowAdvisorToResult" sourceRef="advisorApproval" targetRef="gatewayApprovalResult"/>
+    <sequenceFlow id="flowDeanToResult" sourceRef="deanApproval" targetRef="gatewayApprovalResult"/>
+    <!-- 拒绝：退回提交人重新提交（双模式兼容：Boolean approved=false 或 String approval='rejected'） -->
+    <sequenceFlow id="flowResultToResubmit" sourceRef="gatewayApprovalResult" targetRef="submitLeave">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${approved == false || "rejected".equals(approval)}]]></conditionExpression>
+    </sequenceFlow>
+    <!-- 同意：结束（双模式兼容：Boolean approved=true 或 String approval='approved'） -->
+    <sequenceFlow id="flowResultToEnd" sourceRef="gatewayApprovalResult" targetRef="endEvent">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${approved == true || "approved".equals(approval)}]]></conditionExpression>
+    </sequenceFlow>
+    <!-- 兜底默认流：结束 -->
+    <sequenceFlow id="flowResultToEndDefault" sourceRef="gatewayApprovalResult" targetRef="endEvent"/>
   </process>
   <!-- BPMN 图形信息定义 -->
   <bpmndi:BPMNDiagram id="BPMNDiagram_leaveProcess">
@@ -127,14 +140,44 @@
         <omgdi:waypoint x="540" y="190"/>
         <omgdi:waypoint x="590" y="205"/>
       </bpmndi:BPMNEdge>
-      <!-- 连线：辅导员审批 -> 结束 -->
-      <bpmndi:BPMNEdge id="edge_flowAdvisorToEnd" bpmnElement="flowAdvisorToEnd">
+      <!-- 审批结果网关（菱形，位于结束事件下方） -->
+      <bpmndi:BPMNShape id="shape_gatewayApprovalResult" bpmnElement="gatewayApprovalResult">
+        <omgdc:Bounds x="760" y="245" width="50" height="50"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="748" y="295" width="80" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <!-- 连线：辅导员审批 -> 审批结果网关 -->
+      <bpmndi:BPMNEdge id="edge_flowAdvisorToResult" bpmnElement="flowAdvisorToResult">
         <omgdi:waypoint x="690" y="115"/>
+        <omgdi:waypoint x="785" y="115"/>
+        <omgdi:waypoint x="785" y="245"/>
+      </bpmndi:BPMNEdge>
+      <!-- 连线：院长审批 -> 审批结果网关 -->
+      <bpmndi:BPMNEdge id="edge_flowDeanToResult" bpmnElement="flowDeanToResult">
+        <omgdi:waypoint x="690" y="205"/>
+        <omgdi:waypoint x="735" y="220"/>
+        <omgdi:waypoint x="735" y="270"/>
+        <omgdi:waypoint x="760" y="270"/>
+      </bpmndi:BPMNEdge>
+      <!-- 连线：审批结果网关 -> 退回提交人（驳回） -->
+      <bpmndi:BPMNEdge id="edge_flowResultToResubmit" bpmnElement="flowResultToResubmit">
+        <omgdi:waypoint x="785" y="295"/>
+        <omgdi:waypoint x="210" y="320"/>
+        <omgdi:waypoint x="210" y="198"/>
+      </bpmndi:BPMNEdge>
+      <!-- 连线：审批结果网关 -> 结束（同意） -->
+      <bpmndi:BPMNEdge id="edge_flowResultToEnd" bpmnElement="flowResultToEnd">
+        <omgdi:waypoint x="810" y="270"/>
+        <omgdi:waypoint x="830" y="270"/>
+        <omgdi:waypoint x="830" y="154"/>
         <omgdi:waypoint x="760" y="154"/>
       </bpmndi:BPMNEdge>
-      <!-- 连线：院长审批 -> 结束 -->
-      <bpmndi:BPMNEdge id="edge_flowDeanToEnd" bpmnElement="flowDeanToEnd">
-        <omgdi:waypoint x="690" y="205"/>
+      <!-- 连线：审批结果网关 -> 结束（兜底默认流） -->
+      <bpmndi:BPMNEdge id="edge_flowResultToEndDefault" bpmnElement="flowResultToEndDefault">
+        <omgdi:waypoint x="760" y="250"/>
+        <omgdi:waypoint x="740" y="250"/>
+        <omgdi:waypoint x="740" y="154"/>
         <omgdi:waypoint x="760" y="154"/>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>

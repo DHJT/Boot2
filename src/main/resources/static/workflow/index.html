@@ -158,6 +158,9 @@
                 <div class="nav-item" onclick="switchTab('multilevel')">
                     <span class="icon">🏗️</span> 多级审批
                 </div>
+                <div class="nav-item" onclick="switchTab('dmn')">
+                    <span class="icon">🧮</span> 决策表
+                </div>
                 <div class="nav-item" onclick="switchTab('tasks')">
                     <span class="icon">📌</span> 我的待办
                 </div>
@@ -196,6 +199,16 @@
 
         // ======== 工具函数 ========
         function $(id) { return document.getElementById(id); }
+
+        // HTML 转义：所有插入 innerHTML 的用户可控内容必须经此处理，防止存储型 XSS
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
         function showToast(msg, type = 'success') {
             const t = $('toast');
@@ -273,7 +286,7 @@
         function switchTab(tab) {
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             document.querySelector(`.nav-item[onclick*="${tab}"]`)?.classList.add('active');
-            const renderers = { dashboard: renderDashboard, processes: renderProcesses, tasks: renderTasks, users: renderUsers, depts: renderDepts, roles: renderRoles, notifications: renderNotifications, leave: renderLeave, multilevel: renderMultiLevel };
+            const renderers = { dashboard: renderDashboard, processes: renderProcesses, tasks: renderTasks, users: renderUsers, depts: renderDepts, roles: renderRoles, notifications: renderNotifications, leave: renderLeave, multilevel: renderMultiLevel, dmn: renderDmn };
             (renderers[tab] || (() => {}))();
         }
 
@@ -718,8 +731,8 @@
                     <div class="process-card-header" style="padding:12px 16px;background:#f5f7fa;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ebeef5;cursor:pointer;" onclick="toggleLeaveExpand('${p.processInstanceId}')">
                         <div style="display:flex;align-items:center;gap:10px;">
                             <span class="badge ${p.status==='running'?'badge-warning':'badge-info'}">${p.status==='running'?'运行中':'已结束'}</span>
-                            <div><strong style="font-size:14px;">${p.applicantName||'未知'} 的请假申请</strong>
-                            <div style="font-size:12px;color:#909399;margin-top:2px;">原因：${p.reason||'-'} · 天数：${p.days||'-'}天 · ${formatTime(p.startTime)}</div></div>
+                            <div><strong style="font-size:14px;">${esc(p.applicantName)||'未知'} 的请假申请</strong>
+                            <div style="font-size:12px;color:#909399;margin-top:2px;">原因：${esc(p.reason)||'-'} · 天数：${esc(p.days)||'-'}天 · ${formatTime(p.startTime)}</div></div>
                         </div>
                         <div style="display:flex;gap:6px;">
                             <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();showDiagramLeave('${p.processInstanceId}')">流程图</button>
@@ -727,7 +740,7 @@
                         </div>
                     </div>
                     <div id="leaveBody_${p.processInstanceId}" style="${isExpanded?'':'display:none;'}padding:12px 16px;">
-                        ${renderLeaveTimeline(p.timeline)}
+                        ${renderLeaveTimeline(p.timeline, p)}
                     </div>
                 </div>`;
             }).join('');
@@ -738,8 +751,11 @@
             if (body) { body.style.display = body.style.display === 'none' ? '' : 'none'; }
         }
 
-        function renderLeaveTimeline(timeline) {
+        function renderLeaveTimeline(timeline, proc) {
             if (!timeline || !timeline.length) return '<div style="color:#909399;text-align:center;padding:16px;">暂无审批记录</div>';
+            const currentUser = state.user?.name || state.user?.username || '';
+            // 重提数据经 encodeURIComponent 编码放入 data 属性（避免内联 JSON 的 XSS 双重解码问题）
+            const procData = encodeURIComponent(JSON.stringify(proc || {}));
             return `<div class="timeline">${timeline.map(t => {
                 // 取第一个用户记录（兼容多实例）
                 const u = (t.users && t.users.length > 0) ? t.users[0] : {};
@@ -748,17 +764,30 @@
                 const dotClass = t.status === 'pending' ? 'pending' : (rejected ? 'rejected' : 'completed');
                 const dotIcon = t.status === 'pending' ? '⏳' : (rejected ? '✕' : '✓');
                 const hasAction = (u.status === 'pending' || u.status === 'claimed') && u.taskId;
+                // 驳回重提：当前待办是"提交请假申请"任务且归属当前用户时，显示重新提交按钮
+                const isSubmitTask = t.taskDefinitionKey === 'submitLeave' && hasAction && u.assignee === currentUser;
+                const actionBtns = isSubmitTask
+                    ? `<div class="approval-btns"><button class="btn btn-primary btn-sm" data-task-id="${esc(u.taskId)}" data-proc="${procData}" onclick="openResubmitFromBtn(this)">📝 重新提交</button></div>`
+                    : (hasAction ? `<div class="approval-btns"><button class="btn btn-success btn-sm" onclick="quickApproveLeave('${esc(u.taskId)}',true)">✅ 同意</button><button class="btn btn-danger btn-sm" onclick="quickApproveLeave('${esc(u.taskId)}',false)">❌ 拒绝</button></div>` : '');
                 return `<div class="timeline-item">
                     <div class="timeline-dot ${dotClass}">${dotIcon}</div>
                     <div class="timeline-content">
-                        <div class="tl-title">${t.taskName||'-'} ${t.status === 'pending' ? '<span class="badge badge-warning">待审批</span>' : (rejected ? '<span class="badge badge-danger">拒绝</span>' : '<span class="badge badge-success">通过</span>')}</div>
-                        <div class="tl-info">处理人: ${u.assignee||'-'} | ${formatTime(t.startTime)}</div>
-                        ${u.comment ? '<div class="tl-comment">💬 ' + u.comment + '</div>' : ''}
-                        ${u.candidateGroups && u.candidateGroups.length > 0 ? '<div class="tl-info">候选组: ' + u.candidateGroups.join(', ') + '</div>' : ''}
-                        ${hasAction ? '<div class="approval-btns"><button class="btn btn-success btn-sm" onclick="quickApproveLeave(\''+u.taskId+'\',true)">✅ 同意</button><button class="btn btn-danger btn-sm" onclick="quickApproveLeave(\''+u.taskId+'\',false)">❌ 拒绝</button></div>' : ''}
+                        <div class="tl-title">${esc(t.taskName)||'-'} ${t.status === 'pending' ? '<span class="badge badge-warning">待处理</span>' : (rejected ? '<span class="badge badge-danger">拒绝</span>' : '<span class="badge badge-success">通过</span>')}</div>
+                        <div class="tl-info">处理人: ${esc(u.assignee)||'-'} | ${formatTime(t.startTime)}</div>
+                        ${u.comment ? '<div class="tl-comment">💬 ' + esc(u.comment) + '</div>' : ''}
+                        ${u.candidateGroups && u.candidateGroups.length > 0 ? '<div class="tl-info">候选组: ' + esc(u.candidateGroups.join(', ')) + '</div>' : ''}
+                        ${actionBtns}
                     </div>
                 </div>`;
             }).join('')}</div>`;
+        }
+
+        // 从按钮 data 属性读取任务与流程数据（防内联 JSON 注入）
+        function openResubmitFromBtn(btn) {
+            const taskId = btn.getAttribute('data-task-id') || '';
+            let proc = {};
+            try { proc = JSON.parse(decodeURIComponent(btn.getAttribute('data-proc') || '{}')); } catch (e) { proc = {}; }
+            openResubmitModal(taskId, proc);
         }
 
         function doStartLeave() {
@@ -845,8 +874,8 @@
                     <div class="process-card-header" style="padding:12px 16px;background:#f5f7fa;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ebeef5;cursor:pointer;" onclick="toggleMultiExpand('${p.processInstanceId}')">
                         <div style="display:flex;align-items:center;gap:10px;">
                             <span class="badge ${p.status==='running'?'badge-warning':'badge-info'}">${p.status==='running'?'运行中':'已结束'}</span>
-                            <div><strong style="font-size:14px;">${p.applicantName||'未知'} 的申请</strong>
-                            <div style="font-size:12px;color:#909399;margin-top:2px;">原因：${p.reason||'-'} · 天数：${p.days||'-'}天 · ${formatTime(p.startTime)}</div></div>
+                            <div><strong style="font-size:14px;">${esc(p.applicantName)||'未知'} 的申请</strong>
+                            <div style="font-size:12px;color:#909399;margin-top:2px;">原因：${esc(p.reason)||'-'} · 天数：${esc(p.days)||'-'}天 · ${formatTime(p.startTime)}</div></div>
                         </div>
                         <div style="display:flex;gap:6px;">
                             <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();showDiagramMulti('${p.processInstanceId}')">流程图</button>
@@ -885,11 +914,11 @@
                 return `<div class="timeline-item">
                     <div class="timeline-dot ${dotClass}">${dotIcon}</div>
                     <div class="timeline-content">
-                        <div class="tl-title">${t.taskName||'-'} ${t.status === 'pending' ? '<span class="badge badge-warning">待审批</span>' : (rejected ? '<span class="badge badge-danger">拒绝</span>' : '<span class="badge badge-success">通过</span>')}</div>
-                        <div class="tl-info">处理人: ${u.assignee||'-'} | ${formatTime(t.startTime)}</div>
-                        ${u.comment ? '<div class="tl-comment">💬 ' + u.comment + '</div>' : ''}
-                        ${u.candidateGroups && u.candidateGroups.length > 0 ? '<div class="tl-info">候选组: ' + u.candidateGroups.join(', ') + '</div>' : ''}
-                        ${hasAction ? '<div class="approval-btns"><button class="btn btn-success btn-sm" onclick="quickApproveMulti(\''+u.taskId+'\',\'approved\')">✅ 同意</button><button class="btn btn-danger btn-sm" onclick="quickApproveMulti(\''+u.taskId+'\',\'rejected\')">❌ 拒绝</button></div>' : ''}
+                        <div class="tl-title">${esc(t.taskName)||'-'} ${t.status === 'pending' ? '<span class="badge badge-warning">待审批</span>' : (rejected ? '<span class="badge badge-danger">拒绝</span>' : '<span class="badge badge-success">通过</span>')}</div>
+                        <div class="tl-info">处理人: ${esc(u.assignee)||'-'} | ${formatTime(t.startTime)}</div>
+                        ${u.comment ? '<div class="tl-comment">💬 ' + esc(u.comment) + '</div>' : ''}
+                        ${u.candidateGroups && u.candidateGroups.length > 0 ? '<div class="tl-info">候选组: ' + esc(u.candidateGroups.join(', ')) + '</div>' : ''}
+                        ${hasAction ? '<div class="approval-btns"><button class="btn btn-success btn-sm" onclick="quickApproveMulti(\''+esc(u.taskId)+'\',\'approved\')">✅ 同意</button><button class="btn btn-danger btn-sm" onclick="quickApproveMulti(\''+esc(u.taskId)+'\',\'rejected\')">❌ 拒绝</button></div>' : ''}
                     </div>
                 </div>`;
             }).join('')}</div>`;
@@ -923,6 +952,148 @@
             const comment = $('multiComment').value || (approval==='approved'?'同意':'驳回');
             api('/flowable/task/approve?taskId='+taskId+'&approved='+(approval==='approved')+'&comment='+encodeURIComponent(comment), { method: 'POST' })
                 .then(r => { showToast('审批完成'); closeModal(); renderMultiLevel(); })
+                .catch(e => showToast(e.message, 'error'));
+        }
+
+        // ======== 决策表管理（DMN） ========
+        function renderDmn() {
+            const mc = $('mainContent');
+            mc.innerHTML = `
+                <div class="page-title">🧮 决策表管理</div>
+                <div class="stats-grid" id="dmnStatsGrid">
+                    <div class="stat-card"><div class="stat-icon">📄</div><div class="stat-value" id="dmnStatCount">-</div><div class="stat-label">决策表数量</div></div>
+                    <div class="stat-card"><div class="stat-icon">⚡</div><div class="stat-value" id="dmnStatEval">-</div><div class="stat-label">评估接口</div></div>
+                    <div class="stat-card"><div class="stat-icon">🔄</div><div class="stat-value">自动</div><div class="stat-label">启动部署</div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">🧪 在线评估</div><div><button class="btn btn-outline btn-sm" onclick="renderDmn()">🔄 重置</button></div></div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+                        <div><label style="font-size:12px;color:#888;">请假天数</label><br><input id="dmnDays" type="number" value="2" min="1" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px;width:90px;"></div>
+                        <div><label style="font-size:12px;color:#888;">部门</label><br>
+                            <select id="dmnDept" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px;width:130px;">
+                                <option value="技术部" selected>技术部</option>
+                                <option value="财务部">财务部</option>
+                                <option value="行政部">行政部</option>
+                                <option value="人事部">人事部</option>
+                                <option value="研发部">研发部</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn btn-primary" onclick="doEvaluateDmn('approval-path')">审批路径评估</button>
+                            <button class="btn btn-outline" onclick="doEvaluateDmn('days')">天数评估</button>
+                            <button class="btn btn-outline" onclick="doEvaluateDmn('department')">部门评估</button>
+                            <button class="btn btn-outline" onclick="doEvaluateDmn('combined')">综合评估</button>
+                        </div>
+                    </div>
+                    <div id="dmnEvalResult" style="margin-top:12px;font-size:12px;"></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">📋 已部署决策表</div><div><button class="btn btn-outline btn-sm" onclick="loadDmnData()">🔄 刷新</button></div></div>
+                    <div id="dmnTableList"><div class="empty-state">加载中...</div></div>
+                </div>`;
+            loadDmnData();
+        }
+
+        async function loadDmnData() {
+            try {
+                const decisions = await api('/dmn/decisions?t=' + Date.now()).catch(() => []);
+                $('dmnStatCount').textContent = (decisions||[]).length || 0;
+                $('dmnStatEval').textContent = 4;
+                renderDmnList(decisions||[]);
+            } catch(e) { $('dmnTableList').innerHTML = '<div class="empty-state">加载失败：' + (e.message||'') + '</div>'; }
+        }
+
+        function renderDmnList(decisions) {
+            if (!decisions.length) {
+                $('dmnTableList').innerHTML = '<div class="empty-state">暂无已部署决策表（应用启动时会自动部署，或手动调 POST /dmn/deploy/all）</div>';
+                return;
+            }
+            $('dmnTableList').innerHTML = `
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead><tr style="background:#f5f7fa;text-align:left;">
+                        <th style="padding:8px 10px;border-bottom:1px solid #ebeef5;">决策Key</th>
+                        <th style="padding:8px 10px;border-bottom:1px solid #ebeef5;">名称</th>
+                        <th style="padding:8px 10px;border-bottom:1px solid #ebeef5;">版本</th>
+                        <th style="padding:8px 10px;border-bottom:1px solid #ebeef5;">类型</th>
+                        <th style="padding:8px 10px;border-bottom:1px solid #ebeef5;">操作</th>
+                    </tr></thead>
+                    <tbody>${decisions.map(d => `
+                        <tr style="cursor:pointer;" onclick="showDmnDetail('${d.key}')">
+                            <td style="padding:8px 10px;border-bottom:1px solid #f0f2f5;">${d.key||'-'}</td>
+                            <td style="padding:8px 10px;border-bottom:1px solid #f0f2f5;">${d.name||'-'}</td>
+                            <td style="padding:8px 10px;border-bottom:1px solid #f0f2f5;">v${d.version||'-'}</td>
+                            <td style="padding:8px 10px;border-bottom:1px solid #f0f2f5;">${d.decisionType||'-'}</td>
+                            <td style="padding:8px 10px;border-bottom:1px solid #f0f2f5;"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();showDmnDetail('${d.key}')">查看规则</button></td>
+                        </tr>`).join('')}</tbody>
+                </table>`;
+        }
+
+        function showDmnDetail(key) {
+            openModal(`<h2>📄 决策表详情：${key}</h2><div id="dmnDetailBody"><div class="empty-state">加载中...</div></div>
+                <div class="form-actions"><button class="btn btn-primary" onclick="closeModal()">关闭</button></div>`);
+            api('/dmn/decisions/' + encodeURIComponent(key))
+                .then(detail => {
+                    const decs = detail.decisions || [];
+                    $('dmnDetailBody').innerHTML = decs.map(dec => {
+                        const inputs = (dec.inputs||[]).map(i => `<span style="background:#ecf5ff;color:#409EFF;padding:2px 8px;border-radius:4px;margin-right:6px;">${i.label||i.text||'-'}</span>`).join('');
+                        const outputs = (dec.outputs||[]).map(o => `<span style="background:#f0f9eb;color:#67C23A;padding:2px 8px;border-radius:4px;margin-right:6px;">${o.name||o.label||'-'}</span>`).join('');
+                        return `<div style="border:1px solid #ebeef5;border-radius:8px;padding:12px;margin-bottom:12px;">
+                            <div style="font-weight:600;margin-bottom:6px;">${dec.name||dec.id||'-'}</div>
+                            <div style="font-size:12px;color:#606266;margin-bottom:4px;">命中策略: <b>${dec.hitPolicy||'-'}</b> · 规则数: <b>${dec.ruleCount||0}</b></div>
+                            <div style="font-size:12px;color:#606266;margin-bottom:4px;">输入: ${inputs||'-'}</div>
+                            <div style="font-size:12px;color:#606266;">输出: ${outputs||'-'}</div>
+                        </div>`;
+                    }).join('') || '<div class="empty-state">无决策表定义信息</div>';
+                })
+                .catch(e => { $('dmnDetailBody').innerHTML = '<div class="empty-state">加载失败：' + (e.message||'') + '</div>'; });
+        }
+
+        async function doEvaluateDmn(mode) {
+            const days = parseInt($('dmnDays').value) || 1;
+            const deptName = $('dmnDept').value;
+            const resultEl = $('dmnEvalResult');
+            resultEl.innerHTML = '<div class="empty-state" style="padding:8px;">评估中...</div>';
+            try {
+                const path = mode === 'days' ? `/dmn/evaluate/days?days=${days}`
+                    : mode === 'department' ? `/dmn/evaluate/department?deptName=${encodeURIComponent(deptName)}`
+                    : mode === 'combined' ? `/dmn/evaluate/combined?days=${days}&deptName=${encodeURIComponent(deptName)}`
+                    : `/dmn/evaluate/approval-path?days=${days}&deptName=${encodeURIComponent(deptName)}`;
+                const data = await api(path);
+                const rows = Object.entries(data||{}).map(([k,v]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;color:#909399;width:180px;">${esc(k)}</td><td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;">${esc(JSON.stringify(v))}</td></tr>`).join('');
+                resultEl.innerHTML = `<div style="border:1px solid #ebeef5;border-radius:8px;overflow:hidden;background:#fafafa;">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>${rows}</tbody></table></div>`;
+            } catch(e) {
+                resultEl.innerHTML = '<div class="empty-state" style="padding:8px;color:#F56C6C;">评估失败：' + (e.message||'') + '</div>';
+            }
+        }
+
+        // ======== 驳回重提（提交人重新提交） ========
+        function openResubmitModal(taskId, proc) {
+            const cur = proc || {};
+            const depts = ['技术部','财务部','行政部','人事部','研发部'];
+            const curDept = depts.includes(cur.deptName) ? cur.deptName : '技术部';
+            const options = depts.map(d => `<option value="${d}" ${d===curDept?'selected':''}>${d}</option>`).join('');
+            openModal(`<h2>📝 重新提交请假申请</h2>
+                <div style="background:#fdf6ec;color:#E6A23C;border:1px solid #faecd8;border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:12px;">⚠️ 该申请曾被驳回，请修改后重新提交，将重新进行 DMN 决策评估。</div>
+                <div class="form-group"><label>申请人</label><input id="resubmitApplicant" value="${esc(cur.applicantName || state.user.name || state.user.username || '')}" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:4px;"></div>
+                <div class="form-group"><label>请假原因</label><textarea id="resubmitReason" rows="2" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:4px;">${esc(cur.reason || '')}</textarea></div>
+                <div class="form-group"><label>请假天数</label><input id="resubmitDays" type="number" min="1" value="${esc(cur.days || 1)}" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:4px;"></div>
+                <div class="form-group"><label>所属部门</label><select id="resubmitDept" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:4px;">${options}</select></div>
+                <div class="form-actions">
+                    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+                    <button class="btn btn-primary" onclick="doResubmit('${esc(taskId)}')">确认重新提交</button>
+                </div>`);
+        }
+
+        function doResubmit(taskId) {
+            const applicantName = $('resubmitApplicant').value.trim();
+            const reason = $('resubmitReason').value.trim();
+            const days = parseInt($('resubmitDays').value) || 1;
+            const deptName = $('resubmitDept').value;
+            if (!reason) { showToast('请输入请假原因', 'error'); return; }
+            if (!applicantName) { showToast('请输入申请人', 'error'); return; }
+            api('/flowable/task/complete?taskId='+taskId+'&applicantName='+encodeURIComponent(applicantName)+'&reason='+encodeURIComponent(reason)+'&days='+days+'&deptName='+encodeURIComponent(deptName), { method: 'POST' })
+                .then(r => { showToast('已重新提交，进入新一轮审批'); closeModal(); renderLeave(); })
                 .catch(e => showToast(e.message, 'error'));
         }
 

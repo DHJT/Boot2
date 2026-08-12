@@ -1,0 +1,41 @@
+# 测试环境配置：内存 H2，与开发库(./flowable_db)完全隔离
+server:
+  port: 0
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:flowable_test;DB_CLOSE_DELAY=-1;
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate.ddl-auto: create-drop
+    show-sql: false
+  h2:
+    console:
+      enabled: false
+
+management:
+  endpoint:
+    shutdown:
+      enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+# Flowable 引擎（BPMN 随启动自动部署；DMN 由测试显式 deployAll 验证，避免与自动部署互相干扰）
+flowable:
+  dmn:
+    resource-location: classpath:/processes/
+    deploy-resources: false
+  async-executor-activate: false
+  database-schema-update: true
+  check-process-definitions: true
+  process-definition-location-prefix: classpath:/processes/
+
+# 关闭 DMN 启动自动部署 Runner，保证测试对部署行为断言的可控性
+app:
+  dmn:
+    auto-deploy: false

@@ -1,126 +1,122 @@
-# Spring Boot 3.x
-<!-- @author DHJT 2018-09-28 -->
+# Spring Boot 3 + Flowable 工作流平台
 
-<p align="center">
-	<strong>A project of SpringBoot3.</strong>
-</p>
-<p align="center">
-	<a href="http://search.maven.org/#artifactdetails%7Ccn.hutool%7Chutool-all%7C4.1.10%7Cjar">
-		<img src="https://img.shields.io/badge/version-1.0-blue.svg" >
-	</a>
-	<a href="https://mit-license.org/">
-		<img src="http://img.shields.io/:license-mit-blue.svg" >
-	</a>
-	<a>
-		<img src="https://img.shields.io/badge/JDK-1.8+-green.svg" >
-	</a>
-</p>
+<!-- @author DHJT -->
 
-#### 项目介绍
-该项目是在Maven工具下建立的一个`Spring Boot 3`项目，可能生成各种版本和分支，用来改变项目的方向
+基于 **Spring Boot 3.3.1 + Flowable 7.2.0 + Java 21 + H2** 的工作流审批平台，内置 **DMN 决策表** 驱动的请假审批流程（完整审批闭环）、多级复杂审批流程、JWT + RBAC 安全体系、实时通知（WebSocket）与前端管理台。
 
-#### 软件架构
-- 工具说明:
-    + 使用了Spring官方的STS工具
-    + 或者使用IEDA进行编写
-- 使用 Knife4j 进行接口文档展示（Knife4j 是在Swagger上进行了扩展）
+## 技术栈
 
+| 组件 | 版本/说明 |
+|------|-----------|
+| Spring Boot | 3.3.1 |
+| Flowable | 7.2.0（流程引擎 + DMN 决策引擎 + IDM） |
+| Java | 21（`mvn` 需使用 JDK 21，JDK 24 会导致 Lombok 注解处理失效） |
+| 数据库 | H2（开发：文件库 `./flowable_db`；测试：内存库） |
+| 认证 | JWT（jjwt 0.12.6）+ Spring Security |
+| 前端 | 原生 JS / Vue 3 + Element Plus 静态页（`src/main/resources/static/workflow/`） |
+| 接口文档 | Knife4j（`http://localhost:8080/doc.html`） |
 
-#### 安装教程
+## 快速开始
 
-1. xxxx
-2. xxxx
-3. xxxx
+```bash
+# 1. 设置 JDK 21（本项目必须使用 JDK 21 构建）
+set JAVA_HOME=D:\ProgramFiles\Java\jdk-21.0.11
 
-#### 使用说明
+# 2. 运行测试（15 个集成测试，覆盖 DMN 规则与请假流程闭环）
+mvn test
 
-1. Knife4j 接口文档访问地址
-http://localhost:8080/doc.html
+# 3. 启动应用
+mvn spring-boot:run
 
-2. Swagger 接口文档访问地址
-http://localhost:8080/swagger-ui.html
-http://localhost:8080/swagger-ui/index.html
+# 4. 访问
+#   - 前端管理台：http://localhost:8080/workflow/index.html（根路径 / 自动跳转）
+#   - 请假独立演示页：http://localhost:8080/workflow/leave.html
+#   - 多级审批演示页：http://localhost:8080/workflow/multiLevelApprovalProcess.html
+#   - 接口文档：http://localhost:8080/doc.html
+#   - H2 控制台：http://localhost:8080/h2-console（JDBC URL: jdbc:h2:file:./flowable_db，用户 sa）
+```
 
-### 官方在 7.0.0 版本中已正式移除了传统的 Flowable UI 应用。
-- 兼容性版本矩阵：UI模型器最高版本 6.8.1搭配 6.x 版核心且支持Spring Boot 2.x；7.0.0及之后不再提供且官方整体转向云/企业版设计工具支持Spring Boot 3.x。
-- 无法降级使用的风险提示：理论上通过降级核心依赖强制使用旧版UI极不推荐，因为Flowable内部API在6.x和7.x之间发生了大量变化，硬性组合极易引发难以排查的类冲突或方法缺失等运行时错误。
-- 定制开发与外部集成：业务系统已有一套前端架构需要嵌入流程设计能力时，可通过标准REST API与流程引擎交互或借助 bpmn-js 库自主构建。
-- 企业版或官方设计工具：需要独立设计环境推荐使用免费的Flowable云端设计工具，生成标准BPMN XML可直接被引擎执行；要求私有化部署设计工具需联系官方获取Flowable Design等企业级产品与技术支持。
+> 注意：`static/workflow/` 目录名是 `workflow`（原 `wokflow` 为错拼，已重命名），与 `WebMvcConfig` 重定向及 `SecurityConfig` 白名单一致。
 
-#### 参与贡献
+## 决策表（DMN）功能
 
-## 改造完成总结
+应用启动时通过 `DmnAutoDeployRunner` 自动部署 3 张决策表（内容指纹幂等：内容未变化自动跳过，内容变化自动部署新版本；可通过 `app.dmn.auto-deploy` 关闭）。也可手动调用 `POST /dmn/deploy/all` 部署。
 
-已成功完成项目的全面改造，以下是所有变更的详细清单：
+### 决策表清单
 
-### 一、💥 移除 Flowable 7.x 不兼容的 UI 组件（pom.xml）
-- **已删除**：`flowable-spring-boot-starter-ui-modeler`、`flowable-spring-boot-starter-ui-task`、`flowable-spring-boot-starter-ui-admin`、`flowable-spring-boot-starter-ui-idm`（这些组件与 Flowable 7.2.0 不兼容）
-- **保留**：`flowable-spring-boot-starter`（引擎核心）、`flowable-image-generator`（流程图生成）、`flowable-bpmn-layout`（自动布局）
-- **新增**：`jjwt-api/impl/jackson` 0.12.6（JWT 令牌认证）
+| 决策表 Key | 输入 | 输出 | 命中策略 | 用途 |
+|------------|------|------|----------|------|
+| `leaveApprovalPath` | days、deptName | approvalPath（advisor/dean）、finalNeedDeanApproval | FIRST | **流程路由单一决策来源**：请假流程网关据此分流辅导员/院长 |
+| `leaveDaysDecision` | days | leaveCategory（short/long） | UNIQUE | 基础决策表：天数分类 |
+| `leaveDepartmentDecision` | deptName | needDeanApproval | FIRST | 基础决策表：部门是否需要院长审批 |
 
-### 二、🔐 重构安全体系：JWT + RBAC
-- [`SecurityConfig.java`](src/main/java/tech/dhjt/boot3/config/SecurityConfig.java:1)：Spring Security **JWT 无状态认证**，定义白名单路径（`/api/auth/**`、`/flowable/**`、`/ws/**` 等），添加 CORS 全局跨域配置
-- [`JwtUtil.java`](src/main/java/tech/dhjt/boot3/config/JwtUtil.java:1)：JWT **令牌生成/解析/验证**工具，使用 HMAC-SHA256 签名，携带 userId/username/roles 等 claims
-- [`JwtAuthenticationFilter.java`](src/main/java/tech/dhjt/boot3/config/JwtAuthenticationFilter.java:1)：**OncePerRequestFilter**，从 `Authorization: Bearer <token>` 提取并验证 JWT，构建 `UsernamePasswordAuthenticationToken` 存入 SecurityContext
+### leaveApprovalPath 规则（规则顺序即优先级）
 
-### 三、📦 新建 RBAC 表结构（6张业务表）
-| 表名 | 实体 | 功能 |
+| # | 条件 | 审批路径 | 是否院长审批 |
+|---|------|----------|--------------|
+| 1 | days > 3 | dean | true |
+| 2 | days ≤ 3 且 deptName = 行政部 | dean | true |
+| 3 | days ≤ 3 且 deptName = 人事部 | dean | true |
+| 4 | days ≤ 3 且 deptName = 技术部 | advisor | false |
+| 5 | days ≤ 3 且 deptName = 财务部 | advisor | false |
+| 6 | 兜底（其余部门） | advisor | false |
+
+### 决策表 API
+
+| 方法 | 路径 | 说明 |
 |------|------|------|
-| `boot_user` | [`User.java`](src/main/java/tech/dhjt/boot3/model/po/User.java:1) | 用户（含部门、岗位、上级、组） |
-| `boot_dept` | [`Dept.java`](src/main/java/tech/dhjt/boot3/model/po/Dept.java:1) | 部门（树形结构，支持层级路径） |
-| `boot_role` | [`Role.java`](src/main/java/tech/dhjt/boot3/model/po/Role.java:1) | 角色（编码+描述） |
-| `boot_user_role` | [`UserRole.java`](src/main/java/tech/dhjt/boot3/model/po/UserRole.java:1) | 用户-角色关联 |
-| `boot_notification` | [`Notification.java`](src/main/java/tech/dhjt/boot3/model/po/Notification.java:1) | 通知消息（保留原表） |
+| GET | `/dmn/decisions` | 已部署决策表列表（最新版本） |
+| GET | `/dmn/decisions/{key}` | 决策表详情（输入/输出/规则数/命中策略） |
+| GET | `/dmn/evaluate/days?days=` | 天数评估 |
+| GET | `/dmn/evaluate/department?deptName=` | 部门评估 |
+| GET | `/dmn/evaluate/combined?days=&deptName=` | 综合评估（基础表组合） |
+| GET | `/dmn/evaluate/approval-path?days=&deptName=` | **审批路径评估（流程路由依据）** |
+| POST | `/dmn/deploy/all` | 部署全部预定义决策表（内容指纹幂等） |
+| POST | `/dmn/deploy?resourcePath=` | 部署单个决策表 |
+| POST | `/dmn/deploy/upload` / `/dmn/deploy/content` | 上传/内容部署（见"已知限制"） |
 
-### 四、🛠️ 服务层（Repository/Service/Controller）
-- **Repository 层**：`DeptRepository`、`RoleRepository`、`UserRoleRepository`、`UserRepository`、`NotificationRepository`
-- **Service 层**：
-  - [`UserService.java`](src/main/java/tech/dhjt/boot3/service/UserService.java:1)：JWT 登录（返回 token）、用户 CRUD、7 个演示用户 @PostConstruct 初始化
-  - [`DeptService.java`](src/main/java/tech/dhjt/boot3/service/DeptService.java:1)：部门树形管理、treePath 计算、CRUD
-  - [`RoleService.java`](src/main/java/tech/dhjt/boot3/service/RoleService.java:1)：角色管理、用户角色分配/查询
-  - [`NotificationService.java`](src/main/java/tech/dhjt/boot3/service/NotificationService.java:1)：通知持久化+WebSocket 推送（保留原逻辑）
-- **Controller 层**：
-  - [`AuthController.java`](src/main/java/tech/dhjt/boot3/controller/AuthController.java:1)：`POST /api/auth/login`（JSON 传参）
-  - [`SystemController.java`](src/main/java/tech/dhjt/boot3/controller/SystemController.java:1)：`/api/system/depts`、`/roles`、`/users` 完整 CRUD + 用户角色分配 + @PostConstruct 演示数据初始化（5 部门 + 5 角色 + 7 用户角色分配）
-  - [`FlowableController.java`](src/main/java/tech/dhjt/boot3/controller/FlowableController.java:1)：路由前缀改为 `/api/flowable`，保留全部工作流接口
+前端管理台"决策表"页签（`index.html`）提供列表、规则详情与在线评估演示。
 
-### 五、🔄 流程审批与通知完善
-- [`LeaveTaskListener.java`](src/main/java/tech/dhjt/boot3/listener/LeaveTaskListener.java:1)：任务**创建时**通知指定审批人和候选组成员；任务**完成时**通知申请人审批结果
-- [`NotificationEvent.java`](src/main/java/tech/dhjt/boot3/event/NotificationEvent.java:1)：Spring Event 发布/订阅模式
-- [`WebSocketConfig.java`](src/main/java/tech/dhjt/boot3/config/WebSocketConfig.java:1)：WebSocket `/ws/notifications`，按 userId 推送实时通知
+## 请假审批流程（含驳回重提的完整闭环）
 
-### 六、🎨 前端 SPA 管理页面
-[`index.html`](src/main/resources/static/wokflow/index.html:1) — 完整的单页应用（470 行），包含：
-- **登录页**：演示账号提示（admin/zhangsan/lisi/wangwu），JWT Token 存储到 localStorage
-- **控制台**：统计数据（流程数、待办数、未读通知数、用户数）、最近流程/待办列表
-- **流程管理**：部署流程、发起请假、流程列表、流程图查看、审批时间线
-- **我的待办**：待办任务列表，支持**通过/驳回**审批操作
-- **用户管理**：用户 CRUD、用户角色分配
-- **部门管理**：部门 CRUD
-- **角色管理**：角色 CRUD
-- **通知中心**：通知列表、标记已读/全部已读
-- **WebSocket 实时推送**：浏览器自动连接 WebSocket，接收实时通知
+`leave.bpmn20.xml`（key=`leaveProcess`）：
 
-### 七、🏗️ API 接口总览
+```
+提交申请 → DMN决策评估(leaveApprovalPath) → 网关(天数/部门)
+   ├─ finalNeedDeanApproval=false → 辅导员审批(zhangsan,lisi)
+   └─ finalNeedDeanApproval=true  → 院长审批(dean组)
+        └─ 审批结果网关：同意 → 结束
+                       拒绝 → 退回提交人重新提交（可改天数/原因/部门）→ 重新 DMN 评估
+```
 
-| 路径 | 功能 | 认证 |
+- **同意**：`approved=true` 或 `approval='approved'` → 流程结束，通知申请人。
+- **拒绝**：`approved=false` 或 `approval='rejected'` → 退回 `submitLeave`（assignee=申请人），前端提供"重新提交"编辑表单，重提后**重新执行 DMN 评估**（改天数/部门会改变审批路径）。
+- **双模式兼容**：`POST /flowable/task/approve` 的 `approved` 参数同时接受 Boolean、字符串 `"true"/"false"`、字符串 `"approved"/"rejected"`（忽略大小写），服务端归一化后同时写入 `approved` 与 `approval` 两个流程变量，消除跨轮次/跨模式变量残留导致的误驳回。
+- **驳回重提**：`POST /flowable/task/complete`（taskId + 表单变量 days/reason/deptName/applicantName/comment），仅放行白名单变量，流程保留变量（approved/approval/finalNeedDeanApproval 等）一律剥离。
+
+## API 总览（实际映射路径）
+
+| 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST /api/auth/login` | 登录获取 JWT | 无需 |
-| `GET /api/auth/me` | 获取当前用户 | 需要 Token |
-| `GET/POST/PUT/DELETE /api/system/depts` | 部门 CRUD | 需要 Token |
-| `GET/POST/PUT/DELETE /api/system/roles` | 角色 CRUD | 需要 Token |
-| `GET/POST/PUT/DELETE /api/system/users` | 用户 CRUD | 需要 Token |
-| `GET/POST /api/system/users/{id}/roles` | 用户角色分配 | 需要 Token |
-| `POST /api/flowable/deploy` | 部署请假流程 | 需要 Token |
-| `POST /api/flowable/start` | 发起请假 | 需要 Token |
-| `GET /api/flowable/all` | 所有流程列表 | 需要 Token |
-| `GET /api/flowable/detail/{id}` | 流程详情+时间线 | 需要 Token |
-| `POST /api/flowable/multi/complete` | 审批（通过/驳回） | 需要 Token |
-| `GET /api/flowable/notifications/{userId}` | 查询通知 | 需要 Token |
-| `POST /api/flowable/notifications/read/{id}` | 标记已读 | 需要 Token |
-| `ws://localhost:8080/ws/notifications?userId=` | WebSocket 实时推送 | 无 |
+| POST | `/auth/login` | 登录获取 JWT（JSON：username/password） |
+| GET | `/auth/me` | 当前用户信息 |
+| GET/POST/PUT/DELETE | `/system/users`、`/system/depts`、`/system/roles` | 用户/部门/角色 CRUD |
+| POST | `/flowable/deploy?processKey=` | 部署流程（leaveProcess / multiLevelApprovalProcess） |
+| POST | `/flowable/start` / `/flowable/start-with-dept` | 启动流程（后者支持 DMN 部门参数） |
+| GET | `/flowable/all`、`/flowable/detail/{processInstanceId}` | 流程列表 + 详情时间线 |
+| GET | `/flowable/definitions`、`/flowable/diagram` | 流程定义列表 / 流程图（支持高亮） |
+| POST | `/flowable/task/approve?taskId=&approved=&comment=` | 审批（通过/驳回，双模式兼容） |
+| POST | `/flowable/task/complete?taskId=&days=&reason=...` | **完成任务（驳回重提表单变量）** |
+| POST | `/flowable/task/back`、`/back-to-node`、`/back-to-submitter` | 退回操作 |
+| POST | `/flowable/task/claim|unclaim` | 任务认领/释放 |
+| POST | `/flowable/process/suspend|activate|terminate` | 流程暂停/激活/终止 |
+| POST | `/flowable/admin/task/transfer-temporary|transfer-permanent|add-approver|remove-approver|force-complete` | 管理操作（委派/转办/加签/去签/强过） |
+| GET | `/flowable/notifications/{userId}`、`/flowable/tasks/*` | 通知与待办查询 |
+| GET | `/dmn/**` | 见上节决策表 API |
+| WS | `ws://localhost:8080/ws/notifications?userId=` | 实时通知推送 |
 
-### 八、演示用户及角色
+## 演示用户（密码均为 `123456`）
+
 | 用户名 | 姓名 | 部门 | 角色 |
 |--------|------|------|------|
 | admin | 管理员 | 技术部 | ROLE_ADMIN, ROLE_USER |
@@ -131,6 +127,47 @@ http://localhost:8080/swagger-ui/index.html
 | sunqi | 孙七 | 学生处 | ROLE_USER |
 | zhouba | 周八 | 院办 | ROLE_USER, ROLE_DEAN |
 
-> **所有用户密码均为 `123456`**
+> 辅导员审批候选用户：zhangsan、lisi；院长审批候选组：dean（zhouba）。
 
-访问 `http://localhost:8080/flowable/index.html` 即可使用完整的流程审批管理系统。
+## 测试
+
+`mvn test` 运行 15 个集成测试（内存 H2，`src/test/resources/application-test.yml`，不触碰开发库）：
+
+| 测试类 | 覆盖 |
+|--------|------|
+| `DmnIntegrationTest`（5） | 三表部署幂等、天数/部门/审批路径全部规则路径、综合评估一致性 |
+| `LeaveProcessIntegrationTest`（6） | 短假→辅导员、长假→院长、拒绝→驳回重提→重新DMN评估→同意结束、跨模式变量残留回归、变量双写入、时间线 |
+| `ApproveNormalizationTest`（4） | 字符串 `true/false` 线格式审批、`/flowable/task/complete` 重提、保留变量剥离（防注入） |
+
+## 演示：改规则即改流程行为
+
+决策表的威力：**改规则 → 重部署 → 流程行为立即变化**，无需改 BPMN 与 Java 代码。
+
+1. 编辑 `src/main/resources/processes/leaveApprovalPath.dmn`，把规则 1 的条件从 `> 3` 改为 `> 5`（长假标准从 3 天放宽到 5 天）。
+2. 重启应用（自动部署）或调用 `POST /dmn/deploy/all`（内容指纹检测到变化 → 自动部署新版本）。
+3. 发起一笔 **4 天、技术部** 的请假：修改前走"院长审批"，修改后走"辅导员审批"——同一流程定义、同一代码，仅决策表变化即改变路由。
+
+## 已知限制（安全项，已记录待办）
+
+- 当前 `SecurityConfig` 为 `anyRequest().permitAll()` 全开放（JWT 过滤器存在但未强制拦截），`/flowable/**` 与 `/dmn/deploy/**` 均匿名可访问——**仅适合本地演示，不可直接暴露公网**。
+- `GET /flowable/users` 等接口未脱敏；actuator 全量暴露（含 shutdown）；prod 配置含明文 `root/123456`。
+- `/dmn/deploy/content`、`/dmn/deploy/upload` 匿名可覆盖同 key 决策表（业务路由篡改面），建议接入认证后使用。
+- 以上事项见 `TO-DO.md` 安全清单，接入公网前必须处理。
+
+## 项目结构
+
+```
+src/main/java/tech/dhjt/boot3/
+├── controller/          # Auth / Flowable / System / Dmn / Home
+├── service/
+│   ├── dmn/             # DmnService（部署/评估/查询）、DmnEvaluationDelegate（流程内调用）、DmnAutoDeployRunner（自动部署）
+│   ├── flowable/        # ProcessCommonService（审批/退回/待办/时间线/流程图）、ApprovalAdminService（管理操作）
+│   └── impl/            # ProcessServiceImpl
+├── listener/            # GlobalProcessEventListener（全局流程/任务事件 + 通知）
+├── config/              # Security / JWT / WebSocket / FlowableGlobalConfigurer / WebMvcConfig
+├── model/ repository/ enums/ event/
+src/main/resources/
+├── processes/           # leave.bpmn20.xml、multiLevelApprovalProcess.bpmn20.xml、3 张 DMN 决策表
+└── static/workflow/     # index.html（管理台，含决策表页签）、leave.html、multiLevelApprovalProcess.html
+src/test/java/tech/dhjt/boot3/   # DmnIntegrationTest、LeaveProcessIntegrationTest、ApproveNormalizationTest
+```

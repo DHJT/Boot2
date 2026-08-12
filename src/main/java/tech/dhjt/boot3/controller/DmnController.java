@@ -127,6 +127,17 @@ public class DmnController {
         return dmnService.evaluateCombined(days, deptName);
     }
 
+    /**
+     * 评估审批路径决策（天数 + 部门 → 辅导员/院长）
+     */
+    @Operation(summary = "评估审批路径决策", description = "根据请假天数与部门判定审批路径（advisor/dean），请假流程路由的单一决策来源")
+    @GetMapping("/evaluate/approval-path")
+    public Map<String, Object> evaluateApprovalPath(
+            @Parameter(description = "请假天数") @RequestParam int days,
+            @Parameter(description = "部门名称") @RequestParam String deptName) {
+        return dmnService.evaluateApprovalPath(days, deptName);
+    }
+
     // =====================================================================
     //  决策表查询
     // =====================================================================

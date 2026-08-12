@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flowable 请假审批流程演示</title>
+    <title>Flowable 多级复杂审批流程演示</title>
     <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -12,7 +12,7 @@
         #app { min-height: 100vh; }
 
         .app-header {
-            background: linear-gradient(135deg, #409EFF 0%, #337ecc 100%);
+            background: linear-gradient(135deg, #e6a23c 0%, #d4880f 100%);
             color: white; padding: 16px 32px;
             display: flex; align-items: center; justify-content: space-between;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
@@ -34,7 +34,7 @@
 
         .section { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
         .section-title { font-size: 16px; font-weight: 600; color: #303133; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-        .section-title::before { content: ''; display: inline-block; width: 4px; height: 18px; background: #409EFF; border-radius: 2px; }
+        .section-title::before { content: ''; display: inline-block; width: 4px; height: 18px; background: #e6a23c; border-radius: 2px; }
 
         .flow-diagram { text-align: center; background: #fafafa; border-radius: 8px; padding: 16px; border: 1px dashed #dcdfe6; }
         .flow-diagram img { max-width: 100%; max-height: 500px; }
@@ -49,7 +49,7 @@
             display: flex; align-items: center; justify-content: space-between;
             border-bottom: 1px solid #ebeef5; cursor: pointer;
         }
-        .process-card-header:hover { background: #ecf5ff; }
+        .process-card-header:hover { background: #fdf6ec; }
         .process-card-header .left { display: flex; align-items: center; gap: 12px; }
         .process-card-header .left .info h3 { font-size: 15px; font-weight: 600; }
         .process-card-header .left .info .meta { font-size: 12px; color: #909399; margin-top: 2px; }
@@ -104,8 +104,8 @@
 <div id="app">
     <header class="app-header">
         <div>
-            <h1>📋 Flowable 请假审批流程演示</h1>
-            <div class="subtitle">Flowable BPMN 工作流引擎 · Spring Boot 3 · H2 数据库</div>
+            <h1>📋 Flowable 多级复杂审批流程演示</h1>
+            <div class="subtitle">多级审批 · 支持驳回 · 天数条件分支 · Spring Boot 3</div>
         </div>
         <div>
             <el-button size="small" plain round @click="refreshAll" style="color:#fff;border-color:rgba(255,255,255,0.5);">
@@ -159,19 +159,19 @@
 
         <!-- 启动流程 -->
         <div class="section">
-            <div class="section-title">🚀 启动请假流程</div>
+            <div class="section-title">🚀 启动多级审批流程</div>
             <el-form :model="startForm" :inline="true" size="default">
                 <el-form-item label="申请人">
                     <el-input v-model="startForm.applicantName" placeholder="请输入姓名" style="width:140px"></el-input>
                 </el-form-item>
-                <el-form-item label="请假原因">
+                <el-form-item label="申请原因">
                     <el-input v-model="startForm.reason" placeholder="请输入原因" style="width:200px"></el-input>
                 </el-form-item>
-                <el-form-item label="请假天数">
+                <el-form-item label="天数">
                     <el-input-number v-model="startForm.days" :min="1" :max="30" style="width:120px"></el-input-number>
                 </el-form-item>
                 <el-form-item>
-                    <el-button type="primary" @click="startProcess" :loading="starting">提交申请</el-button>
+                    <el-button type="primary" @click="startProcess" :loading="starting" style="background:#e6a23c;border-color:#e6a23c;">提交申请</el-button>
                 </el-form-item>
             </el-form>
             <el-alert v-if="startResult" :title="startResult" type="success" show-icon :closable="true" @close="startResult=''"></el-alert>
@@ -182,7 +182,7 @@
             <div class="section-title">📋 全部流程（按时间倒序 · 运行中在前）</div>
             <div v-if="loadingAll" v-loading="loadingAll" style="min-height:100px;"></div>
             <div v-else-if="processes.length === 0" style="text-align:center;padding:40px;color:#909399;">
-                暂无流程，请先启动一个请假流程
+                暂无流程，请先启动一个多级审批流程
             </div>
             <div v-else>
                 <!-- 流程卡片 -->
@@ -194,7 +194,7 @@
                                 {{ proc.status === 'running' ? '运行中' : '已结束' }}
                             </el-tag>
                             <div class="info">
-                                <h3>{{ proc.applicantName || '未知' }} 的请假申请</h3>
+                                <h3>{{ proc.applicantName || '未知' }} 的申请</h3>
                                 <div class="meta">
                                     <span>原因：{{ proc.reason || '-' }} · 天数：{{ proc.days || '-' }}天</span>
                                     <span style="margin-left:12px;">开始：{{ formatTime(proc.startTime) }}</span>
@@ -204,7 +204,7 @@
                             </div>
                         </div>
                         <div>
-                            <el-button size="small" type="primary" link @click.stop="showDiagram(proc.processInstanceId)">查看流程图</el-button>
+                            <el-button size="small" type="warning" link @click.stop="showDiagram(proc.processInstanceId)">查看流程图</el-button>
                             <el-button size="small" type="default" link @click.stop="toggleExpand(proc.processInstanceId)">
                                 {{ expanded[proc.processInstanceId] ? '收起' : '展开' }}审批流
                                 <span v-if="!expanded[proc.processInstanceId]">▼</span>
@@ -240,16 +240,21 @@
                                         </div>
                                         <div class="node-detail" v-if="u.status === 'completed'">
                                             <span>审批结果：
-                                                <el-tag v-if="u.approved === true" type="success" size="small">同意</el-tag>
-                                                <el-tag v-else-if="u.approved === false" type="danger" size="small">拒绝</el-tag>
+                                                <el-tag v-if="u.approval === 'approved'" type="success" size="small">同意</el-tag>
+                                                <el-tag v-else-if="u.approval === 'rejected'" type="danger" size="small">拒绝</el-tag>
                                                 <span v-else style="color:#909399;">-</span>
                                             </span>
                                             <span v-if="u.comment" style="margin-left:12px;">意见：{{ u.comment }}</span>
                                         </div>
                                         <!-- 待审批/已认领节点的操作按钮 -->
                                         <div class="actions" v-if="(u.status === 'pending' || u.status === 'claimed') && u.taskId">
-                                            <el-button size="small" type="success" @click="quickApprove(node, u, true, proc)">✅ 同意</el-button>
-                                            <el-button size="small" type="danger" @click="quickApprove(node, u, false, proc)">❌ 拒绝</el-button>
+                                            <template v-if="node.taskDefinitionKey === 'submitLeave'">
+                                                <el-button size="small" type="primary" @click="openResubmit(node, u, proc)">📝 重新提交</el-button>
+                                            </template>
+                                            <template v-else>
+                                                <el-button size="small" type="success" @click="quickApprove(node, u, 'approved', proc)">✅ 同意</el-button>
+                                                <el-button size="small" type="danger" @click="quickApprove(node, u, 'rejected', proc)">❌ 拒绝</el-button>
+                                            </template>
                                         </div>
                                     </template>
                                 </div>
@@ -270,8 +275,8 @@
             </div>
             <el-form>
                 <el-form-item label="审批决定">
-                    <el-tag :type="approvalDialog.approved ? 'success' : 'danger'" size="large">
-                        {{ approvalDialog.approved ? '同意' : '拒绝' }}
+                    <el-tag :type="approvalDialog.approval === 'approved' ? 'success' : 'danger'" size="large">
+                        {{ approvalDialog.approval === 'approved' ? '同意' : '拒绝' }}
                     </el-tag>
                 </el-form-item>
                 <el-form-item label="审批意见">
@@ -281,6 +286,22 @@
             <template #footer>
                 <el-button @click="approvalDialog.visible = false">取消</el-button>
                 <el-button type="primary" @click="submitApproval" :loading="approvalDialog.loading">确认提交</el-button>
+            </template>
+        </el-dialog>
+
+        <!-- 驳回重提对话框 -->
+        <el-dialog v-model="resubmitDialog.visible" title="📝 重新提交申请" width="460px">
+            <div style="margin-bottom:12px;padding:10px 12px;background:#fdf6ec;border:1px solid #faecd8;border-radius:6px;color:#e6a23c;font-size:12px;">
+                ⚠️ 该申请曾被驳回，请修改后重新提交。
+            </div>
+            <el-form label-width="80px">
+                <el-form-item label="申请人"><el-input v-model="resubmitDialog.applicantName"></el-input></el-form-item>
+                <el-form-item label="申请原因"><el-input v-model="resubmitDialog.reason" type="textarea" :rows="2"></el-input></el-form-item>
+                <el-form-item label="天数"><el-input-number v-model="resubmitDialog.days" :min="1"></el-input-number></el-form-item>
+            </el-form>
+            <template #footer>
+                <el-button @click="resubmitDialog.visible = false">取消</el-button>
+                <el-button type="primary" @click="doResubmit" :loading="resubmitDialog.loading">确认重新提交</el-button>
             </template>
         </el-dialog>
     </main>
@@ -297,12 +318,12 @@ const app = createApp({
         // 统计数据
         const stats = reactive({ definitions: 0, running: 0, finished: 0, pending: 0 });
 
-        // 流程图
+        // 流程图（默认使用 /flowable/diagram 端点；选中实例后由 loadDetail 刷新）
         const diagramUrl = ref('/flowable/diagram');
         const highlightInstance = ref('');
 
         // 启动流程
-        const startForm = reactive({ applicantName: '张三', reason: '回家探亲', days: 3 });
+        const startForm = reactive({ applicantName: '张三', reason: '项目需求变更', days: 5 });
         const starting = ref(false);
         const startResult = ref('');
 
@@ -313,16 +334,28 @@ const app = createApp({
         // 展开状态
         const expanded = reactive({});
 
-        // 审批对话框
+        // 审批对话框（使用 approval 字符串：'approved'/'rejected'）
         const approvalDialog = reactive({
             visible: false,
             node: null,
             user: null,
             process: null,
-            approved: true,
+            approval: 'approved',
             comment: '',
             loading: false,
             title: '审批确认'
+        });
+
+        // 驳回重提对话框
+        const resubmitDialog = reactive({
+            visible: false,
+            node: null,
+            user: null,
+            process: null,
+            applicantName: '张三',
+            reason: '',
+            days: 1,
+            loading: false
         });
 
         // 工具函数
@@ -342,13 +375,12 @@ const app = createApp({
             try {
                 const [defRes, allRes] = await Promise.all([
                     axios.get('/flowable/definitions'),
-                    axios.get('/flowable/all')
+                    axios.get('/flowable/multi/all?t=' + Date.now())
                 ]);
                 stats.definitions = defRes.data.length;
                 const all = allRes.data;
                 stats.running = all.filter(p => p.status === 'running').length;
                 stats.finished = all.filter(p => p.status === 'finished').length;
-                // 计算待办数：遍历所有运行中流程的timeline中pending节点
                 let pendingCount = 0;
                 all.forEach(p => {
                     if (p.timeline) {
@@ -363,9 +395,8 @@ const app = createApp({
         const loadAllProcesses = async () => {
             loadingAll.value = true;
             try {
-                const res = await axios.get('/flowable/all');
+                const res = await axios.get('/flowable/multi/all');
                 processes.value = res.data;
-                // 默认展开所有运行中的流程
                 res.data.forEach(p => {
                     if (p.status === 'running') {
                         expanded[p.processInstanceId] = true;
@@ -386,7 +417,7 @@ const app = createApp({
             try {
                 const res = await axios.post('/flowable/start', null, {
                     params: {
-                        processKey: 'leaveProcess',
+                        processKey: 'multiLevelApprovalProcess',
                         applicantName: startForm.applicantName,
                         reason: startForm.reason,
                         days: startForm.days
@@ -402,24 +433,24 @@ const app = createApp({
         };
 
         // 快速审批（打开对话框）
-        const quickApprove = (node, user, approved, proc) => {
+        const quickApprove = (node, user, approval, proc) => {
             approvalDialog.node = node;
             approvalDialog.user = user;
             approvalDialog.process = proc;
-            approvalDialog.approved = approved;
+            approvalDialog.approval = approval;
             approvalDialog.comment = '';
             approvalDialog.title = `审批确认 - ${node.taskName}`;
             approvalDialog.visible = true;
         };
 
-        // 提交审批
+        // 提交审批（使用 /flowable/multi/complete）
         const submitApproval = async () => {
             approvalDialog.loading = true;
             try {
                 await axios.post('/flowable/task/approve', null, {
                     params: {
                         taskId: approvalDialog.user.taskId,
-                        approved: approvalDialog.approved,
+                        approved: approvalDialog.approval,
                         comment: approvalDialog.comment
                     }
                 });
@@ -431,10 +462,42 @@ const app = createApp({
             } finally { approvalDialog.loading = false; }
         };
 
+        // 打开驳回重提对话框（预填原提交内容）
+        const openResubmit = (node, user, proc) => {
+            resubmitDialog.node = node;
+            resubmitDialog.user = user;
+            resubmitDialog.process = proc;
+            resubmitDialog.applicantName = proc?.applicantName || '张三';
+            resubmitDialog.reason = proc?.reason || '';
+            resubmitDialog.days = proc?.days || 1;
+            resubmitDialog.visible = true;
+        };
+
+        // 提交重新提交（携带表单变量走 /flowable/task/complete）
+        const doResubmit = async () => {
+            if (!resubmitDialog.reason.trim()) { ElementPlus.ElMessage.warning('请输入申请原因'); return; }
+            resubmitDialog.loading = true;
+            try {
+                await axios.post('/flowable/task/complete', null, {
+                    params: {
+                        taskId: resubmitDialog.user.taskId,
+                        applicantName: resubmitDialog.applicantName,
+                        reason: resubmitDialog.reason,
+                        days: resubmitDialog.days
+                    }
+                });
+                ElementPlus.ElMessage.success('已重新提交');
+                resubmitDialog.visible = false;
+                await refreshAll();
+            } catch (e) {
+                ElementPlus.ElMessage.error('提交失败: ' + (e.response?.data || e.message));
+            } finally { resubmitDialog.loading = false; }
+        };
+
         // 查看流程图
         const showDiagram = (processInstanceId) => {
             highlightInstance.value = processInstanceId;
-            diagramUrl.value = `/flowable/diagram?processInstanceId=${processInstanceId}&t=${Date.now()}`;
+            diagramUrl.value = `/flowable/diagram?processInstanceId=${processInstanceId}&processKey=multiLevelApprovalProcess&t=${Date.now()}`;
         };
 
         // 流程图加载失败
@@ -456,10 +519,11 @@ const app = createApp({
             stats, diagramUrl, highlightInstance,
             startForm, starting, startResult,
             processes, loadingAll, expanded,
-            approvalDialog,
+            approvalDialog, resubmitDialog,
             formatTime, toggleExpand,
             loadAllProcesses, startProcess,
             quickApprove, submitApproval,
+            openResubmit, doResubmit,
             showDiagram, onDiagramError, refreshAll
         };
     }

@@ -52,3 +52,13 @@ hs_err_pid*
 # 临时文件或者目录
 *.bak
 *.tmp
+.nuwaopencodepivot/
+
+# Flowable 运行时数据库（H2 文件库，含业务数据，不应入库）
+flowable_db.mv.db
+flowable_db.trace.db
+*.mv.db
+*.trace.db
+
+# 测试报告
+target/surefire-reports/

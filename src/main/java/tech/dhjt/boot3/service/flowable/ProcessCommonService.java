@@ -116,39 +116,74 @@ public class ProcessCommonService {
      *
      * @param taskId   任务ID
      * @param comment  审批意见
-     * @param approved 审批结果（Boolean 或 String "approved"/"rejected"）
+     * @param approved 审批结果（Boolean / String "true"/"false" / String "approved"/"rejected"，忽略大小写与空白）
      */
     @Transactional
     public void approve(String taskId, Object approved, String comment) {
         Task task = assertTaskExists(taskId);
         String processInstanceId = task.getProcessInstanceId();
 
+        // 入参归一化：兼容 Boolean、字符串布尔（前端 query 参数真实线格式）、approved/rejected 三种形态
+        ApprovalDecision decision = normalizeApproval(approved);
+
         Map<String, Object> variables = new HashMap<>();
         variables.put("comment", comment);
-
-        // 兼容两种模式：Boolean 模式(leave) 和 String 模式(multi)
-        if (approved instanceof Boolean) {
-            variables.put("approved", approved);
-            taskService.setVariableLocal(taskId, "approved", approved);
-            taskService.setVariableLocal(taskId, "comment", comment);
-        } else if (approved instanceof String approvalStr) {
-            variables.put("approval", approvalStr);
-            taskService.setVariableLocal(taskId, "approval", approvalStr);
-            taskService.setVariableLocal(taskId, "comment", comment);
-        } else {
-            // 默认按 Boolean 处理
-            boolean boolVal = Boolean.parseBoolean(String.valueOf(approved));
-            variables.put("approved", boolVal);
-            taskService.setVariableLocal(taskId, "approved", boolVal);
-            taskService.setVariableLocal(taskId, "comment", comment);
-        }
+        // 双变量写入：无论何种输入形态，同时写 approved(Boolean) 与 approval(String)，
+        // 消除跨轮次/跨模式变量残留导致的错误驳回（网关双模式条件均可正确判断）
+        variables.put("approved", decision.approved());
+        variables.put("approval", decision.approval());
+        taskService.setVariableLocal(taskId, "approved", decision.approved());
+        taskService.setVariableLocal(taskId, "approval", decision.approval());
+        taskService.setVariableLocal(taskId, "comment", comment);
 
         taskService.complete(taskId, variables);
-        log.info("审批完成: taskId={}, approved={}, comment={}", taskId, approved, comment);
+        log.info("审批完成: taskId={}, approved={}, approval={}, comment={}",
+                taskId, decision.approved(), decision.approval(), comment);
 
         // 记录审批完成通知
         recordOperationLog(processInstanceId, taskId, "APPROVE",
-                String.format("审批%s: %s", Boolean.TRUE.equals(approved) || "approved".equals(approved) ? "通过" : "拒绝", comment));
+                String.format("审批%s: %s", decision.approved() ? "通过" : "拒绝", comment));
+    }
+
+    /**
+     * 审批结果归一化 — 统一映射为 (Boolean approved, String approval) 二元组
+     * <ul>
+     *   <li>Boolean → 直接映射</li>
+     *   <li>String "true"/"false"（忽略大小写/首尾空白）→ Boolean 语义（前端真实线格式）</li>
+     *   <li>String "approved"/"rejected"（忽略大小写）→ 字符串语义</li>
+     *   <li>其余值 → 参数异常</li>
+     * </ul>
+     */
+    private ApprovalDecision normalizeApproval(Object approved) {
+        if (approved == null) {
+            throw new IllegalArgumentException("审批结果不能为空");
+        }
+        if (approved instanceof Boolean boolValue) {
+            return new ApprovalDecision(boolValue, boolValue ? "approved" : "rejected");
+        }
+        if (approved instanceof String raw) {
+            String value = raw.trim();
+            if (value.equalsIgnoreCase("true")) {
+                return new ApprovalDecision(true, "approved");
+            }
+            if (value.equalsIgnoreCase("false")) {
+                return new ApprovalDecision(false, "rejected");
+            }
+            if (value.equalsIgnoreCase("approved") || value.equalsIgnoreCase("rejected")) {
+                boolean bool = value.equalsIgnoreCase("approved");
+                return new ApprovalDecision(bool, value.toLowerCase());
+            }
+            throw new IllegalArgumentException("无效的审批结果: " + raw);
+        }
+        // 其他类型不支持（与 javadoc 约定一致：仅 Boolean 与上述字符串）
+        throw new IllegalArgumentException("不支持的审批结果类型: " + approved
+                + " (" + approved.getClass().getSimpleName() + ")");
+    }
+
+    /**
+     * 审批归一化结果值对象
+     */
+    private record ApprovalDecision(boolean approved, String approval) {
     }
 
     // =====================================================================
@@ -622,6 +657,76 @@ public class ProcessCommonService {
         approve(taskId, approval, comment);
     }
 
+    /**
+     * 完成任务（携带表单变量）— 用于驳回重提、补充表单等场景
+     * <p>
+     * 仅放行白名单变量（days/reason/deptName/applicantName/comment），
+     * 其余（含 approved/approval/finalNeedDeanApproval 等流程保留变量）一律剥离，
+     * 防止通过任务完成接口覆盖审批结果或流程路由变量。days 归一化为 Integer。
+     *
+     * @param taskId    任务ID
+     * @param variables 表单变量（键值对）
+     */
+    @Transactional
+    public void completeTask(String taskId, Map<String, Object> variables) {
+        Task task = assertTaskExists(taskId);
+
+        // 任务类型防护：仅允许完成"提交类"任务（submitLeave，请假与多级流程共用），
+        // 防止对审批任务调用本接口导致审批变量缺失、静默走默认流结束
+        if (!"submitLeave".equals(task.getTaskDefinitionKey())) {
+            throw new IllegalArgumentException("仅支持完成提交类任务（submitLeave），当前任务节点: "
+                    + task.getTaskDefinitionKey());
+        }
+
+        Set<String> whitelist = Set.of("days", "reason", "deptName", "applicantName", "comment");
+        Set<String> reserved = Set.of("approved", "approval", "finalNeedDeanApproval", "leaveCategory",
+                "approvalPath", "needDeanApproval", "dmnDescription", "initiator", "taskId", "_operationLogs");
+
+        Map<String, Object> filtered = new HashMap<>();
+        if (variables != null) {
+            variables.forEach((key, value) -> {
+                if (reserved.contains(key)) {
+                    log.warn("完成任务时剥离保留变量: taskId={}, key={}", taskId, key);
+                    return;
+                }
+                if (!whitelist.contains(key)) {
+                    log.warn("完成任务时忽略非白名单变量: taskId={}, key={}", taskId, key);
+                    return;
+                }
+                if ("days".equals(key)) {
+                    filtered.put(key, normalizeDays(value));
+                } else {
+                    filtered.put(key, value);
+                }
+            });
+        }
+
+        taskService.complete(taskId, filtered);
+        log.info("任务已完成(携带变量): taskId={}, variables={}", taskId, filtered);
+        recordOperationLog(task.getProcessInstanceId(), taskId, "COMPLETE",
+                String.format("完成任务，提交参数: %s", filtered));
+    }
+
+    /**
+     * days 归一化为 Integer（String/Number 均可，解析失败抛参数异常）
+     */
+    private Integer normalizeDays(Object value) {
+        if (value instanceof Integer integer) {
+            return integer;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value != null) {
+            try {
+                return Integer.parseInt(String.valueOf(value).trim());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("请假天数必须是整数: " + value);
+            }
+        }
+        throw new IllegalArgumentException("请假天数不能为空");
+    }
+
     // =====================================================================
     //  内部工具方法
     // =====================================================================
@@ -897,6 +1002,7 @@ public class ProcessCommonService {
         if (variables.containsKey("applicantName")) result.put("applicantName", variables.get("applicantName"));
         if (variables.containsKey("reason")) result.put("reason", variables.get("reason"));
         if (variables.containsKey("days")) result.put("days", variables.get("days"));
+        if (variables.containsKey("deptName")) result.put("deptName", variables.get("deptName"));
     }
 
     /**

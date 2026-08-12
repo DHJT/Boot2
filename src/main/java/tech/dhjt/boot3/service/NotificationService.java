@@ -69,18 +69,24 @@ public class NotificationService {
     public void handleNotificationEvent(NotificationEvent event) {
         Notification notification = event.getNotification();
 
-        // 构建推送消息
+        // 构建推送消息（使用 HashMap 避免 Map.of 因 null 值（如 PROCESS_END 的 taskId）抛 NPE）
         Map<String, Object> wsMessage = new HashMap<>();
         wsMessage.put("type", "notification");
-        wsMessage.put("notification", Map.of(
-                "id", notification.getId(),
-                "title", notification.getTitle(),
-                "content", notification.getContent(),
-                "type", notification.getType(),
-                "processInstanceId", notification.getProcessInstanceId(),
-                "taskId", notification.getTaskId(),
-                "createTime", notification.getCreateTime().toString()
-        ));
+        Map<String, Object> notificationBody = new HashMap<>();
+        notificationBody.put("id", notification.getId());
+        notificationBody.put("title", notification.getTitle());
+        notificationBody.put("content", notification.getContent());
+        notificationBody.put("type", notification.getType());
+        if (notification.getProcessInstanceId() != null) {
+            notificationBody.put("processInstanceId", notification.getProcessInstanceId());
+        }
+        if (notification.getTaskId() != null) {
+            notificationBody.put("taskId", notification.getTaskId());
+        }
+        if (notification.getCreateTime() != null) {
+            notificationBody.put("createTime", notification.getCreateTime().toString());
+        }
+        wsMessage.put("notification", notificationBody);
         wsMessage.put("unreadCount", notificationRepository.countByUserIdAndReadFalse(notification.getUserId()));
 
         // WebSocket 推送

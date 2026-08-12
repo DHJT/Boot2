@@ -1,24 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="https://www.omg.org/spec/DMN/20151101"
+<definitions xmlns="http://www.omg.org/spec/DMN/20151101"
              xmlns:flowable="http://flowable.org/dmn"
-             id="leaveDepartmentDecision"
+             id="leaveDepartmentDecisionDefs"
              name="请假部门决策"
              namespace="http://flowable.org/dmn">
     <decision id="leaveDepartmentDecision" name="请假部门判断决策">
         <extensionElements>
             <flowable:description>根据提交人的部门判断是否需要院长审批</flowable:description>
         </extensionElements>
-        <informationRequirement id="inputDataDept">
+        <informationRequirement>
             <requiredInput href="#inputDept"/>
         </informationRequirement>
-        <decisionTable id="decisionTableDept" hitPolicy="UNIQUE">
+        <decisionTable id="decisionTableDept" hitPolicy="FIRST">
             <input id="inputDept" label="部门名称" flowable:type="string">
-                <inputExpression id="inputExpressionDept" typeRef="feel:string">
+                <inputExpression id="inputExpressionDept" typeRef="string">
                     <text>deptName</text>
                 </inputExpression>
             </input>
-            <output id="outputNeedDean" label="是否需要院长审批" name="needDeanApproval" typeRef="feel:boolean"/>
+            <output id="outputNeedDean" label="是否需要院长审批" name="needDeanApproval" typeRef="boolean"/>
             <rule id="ruleDept1">
+                <description>技术部：辅导员审批即可</description>
                 <inputEntry id="entryDept1">
                     <text><![CDATA["技术部"]]></text>
                 </inputEntry>
@@ -27,6 +28,7 @@
                 </outputEntry>
             </rule>
             <rule id="ruleDept2">
+                <description>财务部：辅导员审批即可</description>
                 <inputEntry id="entryDept2">
                     <text><![CDATA["财务部"]]></text>
                 </inputEntry>
@@ -35,6 +37,7 @@
                 </outputEntry>
             </rule>
             <rule id="ruleDept3">
+                <description>行政部：需院长审批</description>
                 <inputEntry id="entryDept3">
                     <text><![CDATA["行政部"]]></text>
                 </inputEntry>
@@ -43,6 +46,7 @@
                 </outputEntry>
             </rule>
             <rule id="ruleDept4">
+                <description>人事部：需院长审批</description>
                 <inputEntry id="entryDept4">
                     <text><![CDATA["人事部"]]></text>
                 </inputEntry>
@@ -50,9 +54,11 @@
                     <text><![CDATA[true]]></text>
                 </outputEntry>
             </rule>
+            <!-- 默认规则：其余部门，不需要院长审批（空输入条件=匹配任意；hitPolicy=FIRST 下仅当前 4 条规则未命中时生效） -->
             <rule id="ruleDeptDefault">
+                <description>默认规则：其余部门由辅导员审批</description>
                 <inputEntry id="entryDeptDefault">
-                    <text><![CDATA[true]]></text>
+                    <text></text>
                 </inputEntry>
                 <outputEntry id="outputDeptDefault">
                     <text><![CDATA[false]]></text>
@@ -60,12 +66,4 @@
             </rule>
         </decisionTable>
     </decision>
-    <!-- DMN 图形信息 -->
-    <dmndi:DMNDI>
-        <dmndi:DMNDiagram>
-            <dmndi:DMNShape dmnElementRef="leaveDepartmentDecision">
-                <dc:Bounds x="250" y="150" width="300" height="200"/>
-            </dmndi:DMNShape>
-        </dmndi:DMNDiagram>
-    </dmndi:DMNDI>
 </definitions>

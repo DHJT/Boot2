@@ -5,12 +5,18 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.flowable.dmn.api.*;
 import org.flowable.dmn.model.*;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
@@ -48,12 +54,58 @@ public class DmnService {
     }
 
     /**
-     * 部署所有预定义的 DMN 决策表
+     * 内容指纹幂等部署 — 部署名编码决策 key 与资源内容哈希；
+     * 若同名部署已存在（内容未变化）则跳过，内容变化（哈希不同）则重新部署新版本。
+     *
+     * @param decisionKey  决策表 key（如 leaveApprovalPath）
+     * @param resourcePath classpath 资源路径
+     * @return 本次实际部署的 deploymentId；若跳过（内容未变化）返回 null
+     */
+    @Transactional
+    public String deployDecisionIfChanged(String decisionKey, String resourcePath) {
+        String hash = sha256Resource(resourcePath);
+        String deploymentName = "DMN-" + decisionKey + "-" + hash.substring(0, 12);
+        long exists = dmnRepositoryService.createDeploymentQuery()
+                .deploymentName(deploymentName)
+                .count();
+        if (exists > 0) {
+            log.info("DMN决策表内容未变化，跳过部署: key={}, deploymentName={}", decisionKey, deploymentName);
+            return null;
+        }
+        DmnDeployment deployment = dmnRepositoryService.createDeployment()
+                .name(deploymentName)
+                .addClasspathResource(resourcePath)
+                .deploy();
+        log.info("DMN决策表已部署(内容指纹): key={}, deploymentId={}, deploymentName={}",
+                decisionKey, deployment.getId(), deploymentName);
+        return deployment.getId();
+    }
+
+    /**
+     * 计算 classpath 资源内容的 SHA-256 摘要（十六进制小写）
+     */
+    private String sha256Resource(String resourcePath) {
+        try (InputStream in = new ClassPathResource(resourcePath).getInputStream()) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[4096];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                digest.update(buffer, 0, read);
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (IOException | NoSuchAlgorithmException e) {
+            throw new RuntimeException("读取DMN资源计算哈希失败: " + resourcePath, e);
+        }
+    }
+
+    /**
+     * 部署所有预定义的 DMN 决策表（内容指纹幂等，自动跳过未变化的表）
      */
     @Transactional
     public void deployAll() {
-        deployDecision("processes/leaveDaysDecision.dmn");
-        deployDecision("processes/leaveDepartmentDecision.dmn");
+        deployDecisionIfChanged("leaveApprovalPath", "processes/leaveApprovalPath.dmn");
+        deployDecisionIfChanged("leaveDaysDecision", "processes/leaveDaysDecision.dmn");
+        deployDecisionIfChanged("leaveDepartmentDecision", "processes/leaveDepartmentDecision.dmn");
     }
 
     /**
@@ -189,6 +241,47 @@ public class DmnService {
                 ? "需要院长审批（天数较长或部门规则要求）"
                 : "由辅导员审批即可");
         return combined;
+    }
+
+    /**
+     * 评估审批路径决策 — 根据请假天数与部门综合判定审批路径（advisor/dean）
+     * 该决策表是请假流程路由的单一决策来源（hitPolicy=FIRST，必然单规则命中）
+     *
+     * @param days     请假天数
+     * @param deptName 部门名称
+     * @return 决策结果，包含 approvalPath、finalNeedDeanApproval、description 等字段
+     */
+    public Map<String, Object> evaluateApprovalPath(int days, String deptName) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("days", days);
+        variables.put("deptName", deptName);
+
+        ExecuteDecisionBuilder builder = dmnDecisionService.createExecuteDecisionBuilder()
+                .decisionKey("leaveApprovalPath")
+                .variables(variables);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("days", days);
+        result.put("deptName", deptName);
+        try {
+            Map<String, Object> singleResult = dmnDecisionService.executeWithSingleResult(builder);
+            if (singleResult != null) {
+                result.putAll(singleResult);
+            }
+        } catch (Exception e) {
+            // 未命中任何规则（理论不应发生，FIRST 兜底规则保证）时返回安全默认值
+            log.warn("审批路径决策未命中规则: days={}, deptName={}, msg={}", days, deptName, e.getMessage());
+            result.put("approvalPath", "advisor");
+            result.put("finalNeedDeanApproval", false);
+        }
+
+        String approvalPath = (String) result.getOrDefault("approvalPath", "advisor");
+        boolean needDean = Boolean.TRUE.equals(result.get("finalNeedDeanApproval"));
+        result.put("finalNeedDeanApproval", needDean);
+        result.put("description", needDean
+                ? String.format("请假%d天（%s），需院长审批", days, deptName)
+                : String.format("请假%d天（%s），由辅导员审批即可", days, deptName));
+        return result;
     }
 
     // =====================================================================

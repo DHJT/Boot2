@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/DMN/20151101"
+             xmlns:flowable="http://flowable.org/dmn"
+             id="leaveApprovalPathDefs"
+             name="请假审批路径决策"
+             namespace="http://flowable.org/dmn">
+    <decision id="leaveApprovalPath" name="请假审批路径判断决策">
+        <extensionElements>
+            <flowable:description>根据请假天数与部门综合判定审批路径（辅导员/院长），作为请假流程路由的决策依据</flowable:description>
+        </extensionElements>
+        <informationRequirement>
+            <requiredInput href="#inputDays"/>
+        </informationRequirement>
+        <informationRequirement>
+            <requiredInput href="#inputDept"/>
+        </informationRequirement>
+        <decisionTable id="decisionTableApprovalPath" hitPolicy="FIRST">
+            <input id="inputDays" label="请假天数" flowable:type="integer">
+                <inputExpression id="inputExpressionDays" typeRef="integer">
+                    <text>days</text>
+                </inputExpression>
+            </input>
+            <input id="inputDept" label="部门名称" flowable:type="string">
+                <inputExpression id="inputExpressionDept" typeRef="string">
+                    <text>deptName</text>
+                </inputExpression>
+            </input>
+            <output id="outputApprovalPath" label="审批路径" name="approvalPath" typeRef="string"/>
+            <output id="outputNeedDean" label="是否需要院长审批" name="finalNeedDeanApproval" typeRef="boolean"/>
+            <!-- 规则 1：长假（>3 天），无论部门，一律院长审批 -->
+            <rule id="ruleLongDays">
+                <description>长假：天数大于3天，需院长审批</description>
+                <inputEntry id="entryLongDays">
+                    <text><![CDATA[> 3]]></text>
+                </inputEntry>
+                <inputEntry id="entryLongDaysDept">
+                    <text></text>
+                </inputEntry>
+                <outputEntry id="outputLongDaysPath">
+                    <text><![CDATA["dean"]]></text>
+                </outputEntry>
+                <outputEntry id="outputLongDaysNeed">
+                    <text><![CDATA[true]]></text>
+                </outputEntry>
+            </rule>
+            <!-- 规则 2：短假且行政部，需院长审批 -->
+            <rule id="ruleAdminDept">
+                <description>行政部短假，需院长审批</description>
+                <inputEntry id="entryAdminDeptDays">
+                    <text><![CDATA[<= 3]]></text>
+                </inputEntry>
+                <inputEntry id="entryAdminDept">
+                    <text><![CDATA["行政部"]]></text>
+                </inputEntry>
+                <outputEntry id="outputAdminDeptPath">
+                    <text><![CDATA["dean"]]></text>
+                </outputEntry>
+                <outputEntry id="outputAdminDeptNeed">
+                    <text><![CDATA[true]]></text>
+                </outputEntry>
+            </rule>
+            <!-- 规则 3：短假且人事部，需院长审批 -->
+            <rule id="ruleHrDept">
+                <description>人事部短假，需院长审批</description>
+                <inputEntry id="entryHrDeptDays">
+                    <text><![CDATA[<= 3]]></text>
+                </inputEntry>
+                <inputEntry id="entryHrDept">
+                    <text><![CDATA["人事部"]]></text>
+                </inputEntry>
+                <outputEntry id="outputHrDeptPath">
+                    <text><![CDATA["dean"]]></text>
+                </outputEntry>
+                <outputEntry id="outputHrDeptNeed">
+                    <text><![CDATA[true]]></text>
+                </outputEntry>
+            </rule>
+            <!-- 规则 4：短假且技术部，辅导员审批即可 -->
+            <rule id="ruleTechDept">
+                <description>技术部短假，辅导员审批</description>
+                <inputEntry id="entryTechDeptDays">
+                    <text><![CDATA[<= 3]]></text>
+                </inputEntry>
+                <inputEntry id="entryTechDept">
+                    <text><![CDATA["技术部"]]></text>
+                </inputEntry>
+                <outputEntry id="outputTechDeptPath">
+                    <text><![CDATA["advisor"]]></text>
+                </outputEntry>
+                <outputEntry id="outputTechDeptNeed">
+                    <text><![CDATA[false]]></text>
+                </outputEntry>
+            </rule>
+            <!-- 规则 5：短假且财务部，辅导员审批即可 -->
+            <rule id="ruleFinanceDept">
+                <description>财务部短假，辅导员审批</description>
+                <inputEntry id="entryFinanceDeptDays">
+                    <text><![CDATA[<= 3]]></text>
+                </inputEntry>
+                <inputEntry id="entryFinanceDept">
+                    <text><![CDATA["财务部"]]></text>
+                </inputEntry>
+                <outputEntry id="outputFinanceDeptPath">
+                    <text><![CDATA["advisor"]]></text>
+                </outputEntry>
+                <outputEntry id="outputFinanceDeptNeed">
+                    <text><![CDATA[false]]></text>
+                </outputEntry>
+            </rule>
+            <!-- 规则 6：兜底（其余部门短假），辅导员审批即可 -->
+            <rule id="ruleDefault">
+                <description>默认规则：其余部门短假，辅导员审批</description>
+                <inputEntry id="entryDefaultDays">
+                    <text></text>
+                </inputEntry>
+                <inputEntry id="entryDefaultDept">
+                    <text></text>
+                </inputEntry>
+                <outputEntry id="outputDefaultPath">
+                    <text><![CDATA["advisor"]]></text>
+                </outputEntry>
+                <outputEntry id="outputDefaultNeed">
+                    <text><![CDATA[false]]></text>
+                </outputEntry>
+            </rule>
+        </decisionTable>
+    </decision>
+</definitions>

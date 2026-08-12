@@ -340,6 +340,19 @@ public class FlowableController {
     }
 
     /**
+     * 完成任务（携带表单变量）— 用于驳回重提、补充表单等场景
+     * 仅放行白名单变量（days/reason/deptName/applicantName/comment），流程保留变量一律剥离
+     */
+    @Operation(summary = "完成任务（携带表单变量）", description = "用于驳回重提等场景，可提交 days/reason/deptName/applicantName/comment 表单变量")
+    @PostMapping("/task/complete")
+    public String completeTask(@RequestParam String taskId,
+                               @RequestParam(required = false) Map<String, String> params) {
+        Map<String, Object> variables = new HashMap<>(params == null ? Map.of() : params);
+        processCommonService.completeTask(taskId, variables);
+        return "任务已完成";
+    }
+
+    /**
      * 暂停流程
      */
     @Operation(summary = "暂停流程")

@@ -136,13 +136,8 @@
             <scope>provided</scope>
             <optional>true</optional>
         </dependency>
-<!--        &lt;!&ndash; Flowable 工作流引擎测试 &ndash;&gt;-->
-<!--        <dependency>-->
-<!--            <groupId>org.flowable</groupId>-->
-<!--            <artifactId>flowable-spring-boot-starter-test</artifactId>-->
-<!--            <version>${flowable.version}</version>-->
-<!--            <scope>test</scope>-->
-<!--        </dependency>-->
+        <!-- Flowable 官方未发布 flowable-spring-boot-starter-test（Maven Central 无此坐标），
+             测试直接使用 flowable-spring-boot-starter 提供的引擎 Bean（RuntimeService/TaskService/DmnService 等） -->
     </dependencies>
 
     <build>
