@@ -22,7 +22,7 @@
 # 1. 设置 JDK 21（本项目必须使用 JDK 21 构建）
 set JAVA_HOME=D:\ProgramFiles\Java\jdk-21.0.11
 
-# 2. 运行测试（15 个集成测试，覆盖 DMN 规则与请假流程闭环）
+# 2. 运行测试（20 个集成测试，覆盖 DMN 规则与请假/多级流程闭环）
 mvn test
 
 # 3. 启动应用
@@ -131,13 +131,14 @@ mvn spring-boot:run
 
 ## 测试
 
-`mvn test` 运行 15 个集成测试（内存 H2，`src/test/resources/application-test.yml`，不触碰开发库）：
+`mvn test` 运行 20 个集成测试（内存 H2，`src/test/resources/application-test.yml`，不触碰开发库）：
 
 | 测试类 | 覆盖 |
 |--------|------|
 | `DmnIntegrationTest`（5） | 三表部署幂等、天数/部门/审批路径全部规则路径、综合评估一致性 |
 | `LeaveProcessIntegrationTest`（6） | 短假→辅导员、长假→院长、拒绝→驳回重提→重新DMN评估→同意结束、跨模式变量残留回归、变量双写入、时间线 |
-| `ApproveNormalizationTest`（4） | 字符串 `true/false` 线格式审批、`/flowable/task/complete` 重提、保留变量剥离（防注入） |
+| `ApproveNormalizationTest`（5） | 字符串 `true/false` 线格式审批、`/flowable/task/complete` 重提、保留变量剥离（防注入）、非提交类任务拒绝 |
+| `MultiLevelProcessIntegrationTest`（4） | 短假通过（经理→hr 归档）、长假通过（经理→总监→归档）、驳回→重提→再审批闭环、Boolean 模式驱动 multi approval 网关回归 |
 
 ## 演示：改规则即改流程行为
 

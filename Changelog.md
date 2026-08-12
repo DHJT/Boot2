@@ -21,7 +21,7 @@
   - 新增 `POST /flowable/task/complete`：携带表单变量完成任务（驳回重提），仅放行白名单变量、剥离流程保留变量（防注入）、days 类型归一化。
   - 前端重命名 `static/wokflow/` → `static/workflow/`（与重定向/白名单对齐）；`multiLevelApprovalProcess.html` 修正不存在的 diagram 端点；`index.html`/`leave.html`/`multiLevelApprovalProcess.html` 增加"重新提交"表单。
 - **测试与文档**
-  - 新增 3 个集成测试类共 15 个用例（DMN 规则全路径、请假流程闭环、驳回重提、变量残留回归、字符串布尔线格式、保留变量剥离），`mvn test` 全绿（内存 H2，与开发库隔离）。
+  - 新增 4 个集成测试类共 20 个用例（DMN 规则全路径、请假流程闭环、驳回重提、变量残留回归、字符串布尔线格式、保留变量剥离、非提交类任务防护、多级流程回归），`mvn test` 全绿（内存 H2，与开发库隔离）。
   - README 重写（API 路径修正、决策表说明、演示步骤、已知限制）；Changelog 同步；TO-DO 更新。
 
 ###### 修复
